@@ -8,11 +8,9 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "black>=26.5.1",
     "sortedcontainers>=2.4.0",
 ]
-
-[project.scripts]
-promatic = "promatic:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]

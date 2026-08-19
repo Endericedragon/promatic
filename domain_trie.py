@@ -9,6 +9,9 @@ class NodeStatus(Enum):
     DIRECT = 1
     PROXY = 2
 
+    def __repr__(self):
+        return self.name
+
 
 class TrieNode:
     def __init__(self, nstat: NodeStatus):
@@ -16,6 +19,12 @@ class TrieNode:
         self.status = nstat
         self.has_proxy_child: bool = False
         self.has_direct_child: bool = False
+
+    def is_pure(self) -> bool:
+        """判断该节点的子节点是否为纯代理/直连节点"""
+        return self.has_proxy_child != self.has_direct_child or (
+            not self.has_direct_child and not self.has_proxy_child
+        )
 
 
 class DomainTrie:
@@ -40,9 +49,12 @@ class DomainTrie:
         node.status = status
 
     def search(self, domain: str) -> NodeStatus:
-        """搜索域名，返回其状态
+        """搜索域名，返回其聚合后的状态
 
-        如果返回LEAF，说明该域名不存在于 Trie 中
+        Returns:
+            - 若domain完全匹配已有的记录，返回该记录的状态
+            - 否则，检查以domain为后缀的所有记录，若这些记录均为代理/直连，则返回该结果
+            - 否则，返回 BRANCH
         """
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
@@ -50,6 +62,10 @@ class DomainTrie:
             if part not in node.children:
                 return NodeStatus.BRANCH
             node = node.children[part]
+            if node.status == NodeStatus.PROXY:
+                return NodeStatus.PROXY
+        if node.is_pure():
+            return NodeStatus.PROXY if node.has_proxy_child else NodeStatus.DIRECT
         return node.status
 
     def view_tree(self):
@@ -59,7 +75,20 @@ class DomainTrie:
             return
 
         def dfs(node: TrieNode, path: Deque[str], depth: int = 0):
-            print("|-" * depth + ".".join(path), node.status)
+            if node.has_direct_child and node.has_proxy_child:
+                msg = ""
+            elif node.has_direct_child:
+                msg = "PureDirect"
+            elif node.has_proxy_child:
+                msg = "PureProxy"
+            else:
+                msg = "LEAF"
+
+            print(
+                "| " * depth
+                + ".".join(path)
+                + " [{}, {}]".format(repr(node.status), msg)
+            )
             for txt, each in node.children.items():
                 path.appendleft(txt)
                 dfs(each, path, depth + 1)
@@ -74,30 +103,27 @@ class DomainTrie:
 
         def dfs(node: TrieNode, path: Deque[str]):
             nonlocal direct_ok_suffixes, proxy_needed_suffixes
-            # 需要判断`node`的子节点的纯净度，即：
-            # 是否全为代理 / 直连节点？
-            if node.has_direct_child and node.has_proxy_child:
-                # 不纯净
+            if node.is_pure():
+                cur_path = ".".join(path)
+                print("聚合规则: {}".format(cur_path))
+                if node.has_direct_child:
+                    direct_ok_suffixes.append(cur_path)
+                else:
+                    proxy_needed_suffixes.append(cur_path)
+            else:
+                cur_path = ".".join(path)
+                match node.status:
+                    case NodeStatus.DIRECT:
+                        direct_ok_suffixes.append(cur_path)
+                    case NodeStatus.PROXY:
+                        proxy_needed_suffixes.append(cur_path)
                 for txt, each in node.children.items():
                     path.appendleft(txt)
                     dfs(each, path)
                     path.popleft()
-            elif node.has_proxy_child:
-                # 纯代理节点
-                proxy_needed_suffixes.append(".".join(path))
-            elif node.has_direct_child:
-                # 纯直连节点
-                direct_ok_suffixes.append(".".join(path))
-            else:
-                # 叶子节点
-                match node.status:
-                    case NodeStatus.PROXY:
-                        proxy_needed_suffixes.append(".".join(path))
-                    case NodeStatus.DIRECT:
-                        direct_ok_suffixes.append(".".join(path))
 
-        for txt, node in self.root.children.items():
-            dfs(node, deque([txt]))
+        for txt, child in self.root.children.items():
+            dfs(child, deque([txt]))
         return direct_ok_suffixes, proxy_needed_suffixes
 
 
@@ -106,11 +132,12 @@ def test():
     trie.insert("www.apple.com.cn", NodeStatus.DIRECT)
     trie.insert("www.google.com", NodeStatus.PROXY)
     trie.insert("account.google.com", NodeStatus.PROXY)
-    trie.insert("a.google.com", NodeStatus.DIRECT)
+    trie.insert("www.baidu.com", NodeStatus.DIRECT)
     trie.view_tree()
     res = trie.compress_and_collect()
     print(res[0])
     print(res[1])
+    print(trie.search("google.com"))
 
 
 if __name__ == "__main__":
