@@ -3,7 +3,7 @@ from pathlib import Path
 from sys import stderr
 from urllib.parse import urlparse
 
-from domain_trie import DomainTrie, NodeStatus
+from domain_trie import DomainTrie, NodeStatus, load_memo, write_memo
 from rw_utils import pipe, read_headers
 
 WRITE_LOCK: aio.Lock = aio.Lock()
@@ -17,33 +17,6 @@ TRIE: DomainTrie = DomainTrie()
 
 def eprint(*args, **kwargs):
     print(*args, file=stderr, **kwargs)
-
-
-def load_memo():
-    whitelist_path = Path("whitelist.txt")
-    blacklist_path = Path("blacklist.txt")
-
-    def mark_as(pp: Path, stat: NodeStatus):
-        global TRIE
-        if pp.exists() and pp.is_file():
-            for each in pp.read_text(encoding="utf-8").splitlines():
-                TRIE.insert(each, stat)
-        else:
-            pp.touch()
-
-    mark_as(whitelist_path, NodeStatus.DIRECT)
-    mark_as(blacklist_path, NodeStatus.PROXY)
-
-
-def write_memo():
-    global TRIE
-    whitelist, blacklist = TRIE.compress_and_collect()
-    with open("whitelist.txt", "w", encoding="utf-8") as f:
-        for each in whitelist:
-            print(each, file=f)
-    with open("blacklist.txt", "w", encoding="utf-8") as f:
-        for each in blacklist:
-            print(each, file=f)
 
 
 async def handle_http(
@@ -76,7 +49,7 @@ async def handle_http(
         except aio.TimeoutError:
             eprint("[Timeout] {}:{}".format(host, port))
         except Exception as e:
-            eprint("[Error HTTP {}:{}] {}: {}".format(host, port, type(e), e))
+            eprint("[Error HTTP Direct {}:{}] {}: {}".format(host, port, type(e), e))
     # 超时后，换成代理访问
     try:
         proxy_reader, proxy_writer = await aio.open_connection(
@@ -90,7 +63,7 @@ async def handle_http(
         # 然后让用户和目标直接双向通信
         await aio.gather(pipe(proxy_reader, writer), pipe(reader, proxy_writer))
     except Exception as e:
-        eprint("[Error 91] {}:{}".format(type(e), e))
+        eprint("[Error HTTP Proxy {}:{}] {}: {}".format(host, port, type(e), e))
     finally:
         writer.close()
 
@@ -122,7 +95,7 @@ async def handle_https(
         except aio.TimeoutError:
             eprint("[Timeout] {}:{}".format(host, port))
         except Exception as e:
-            eprint("[Error HTTPS {}:{}] {}: {}".format(host, port, type(e), e))
+            eprint("[Error HTTPS Direct {}:{}] {}: {}".format(host, port, type(e), e))
     try:
         proxy_reader, proxy_writer = await aio.open_connection(
             "127.0.0.1", BACKEND_PROXY_PORT
@@ -146,7 +119,7 @@ async def handle_https(
             writer.write(result)
             await writer.drain()
     except Exception as e:
-        eprint("[Error 144] {}: {}".format(type(e), e))
+        eprint("[Error HTTPS Proxy {}:{}] {}: {}".format(host, port, type(e), e))
     finally:
         writer.close()
 
@@ -185,7 +158,7 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
 
 
 async def main():
-    load_memo()
+    load_memo(TRIE)
     task = await aio.start_server(start_proxy_server, "127.0.0.1", PORT)
     print("Proxy server started on 127.0.0.1:{}".format(PORT))
     async with task:
@@ -197,4 +170,4 @@ if __name__ == "__main__":
         aio.run(main())
     except KeyboardInterrupt:
         print("Shutting down proxy server...")
-        write_memo()
+        write_memo(TRIE)

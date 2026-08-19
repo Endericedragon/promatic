@@ -4,16 +4,14 @@ import asyncio as aio
 async def pipe(p_in: aio.StreamReader, p_out: aio.StreamWriter):
     """将p_in中的数据写入p_out。当p_in读到EOF时，关掉p_out"""
     try:
-        while not p_in.at_eof():
-            data = await p_in.read(8192)
-            if not data:
-                break
+        while data := await p_in.read(8192):
             p_out.write(data)
             await p_out.drain()
-    finally:
+        # 传输结束，准备关闭p_out
         if p_out.can_write_eof():
             p_out.write_eof()
             await p_out.drain()
+    finally:
         p_out.close()
         await p_out.wait_closed()
 

@@ -1,7 +1,9 @@
-from typing import Dict, List, Deque
-from sortedcontainers import SortedDict
-from enum import Enum
 from collections import deque
+from enum import Enum
+from pathlib import Path
+from typing import Deque, Dict, List
+
+from sortedcontainers import SortedDict
 
 
 class NodeStatus(Enum):
@@ -49,24 +51,30 @@ class DomainTrie:
         node.status = status
 
     def search(self, domain: str) -> NodeStatus:
-        """搜索域名，返回其聚合后的状态
+        """搜索域名，返回其匹配或聚合后的状态
 
-        Returns:
-            - 若domain完全匹配已有的记录，返回该记录的状态
-            - 否则，检查以domain为后缀的所有记录，若这些记录均为代理/直连，则返回该结果
-            - 否则，返回 BRANCH
+        - 若 domain 是 Trie 中某记录的子域名（Trie 记录是 domain 的后缀），继承匹配到的最近父规则
+        - 若 domain 是 Trie 中多条记录的公共后缀，当这些子记录全为代理/直连时，聚合返回对应状态
+        - 若 domain 精确匹配已有记录，返回该记录的状态
         """
+
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
+        last_matched_status: NodeStatus = NodeStatus.BRANCH # 最长匹配到的非BRANCH规则
         for part in parts:
             if part not in node.children:
-                return NodeStatus.BRANCH
+                # Trie 中仅存在domain的后缀，无法继续深入匹配
+                return last_matched_status
             node = node.children[part]
-            if node.status == NodeStatus.PROXY:
-                return NodeStatus.PROXY
+            if node.status != NodeStatus.BRANCH:
+                last_matched_status = node.status
+        # 1. domain完美匹配已有的记录
+        if node.status != NodeStatus.BRANCH:
+            return node.status
+        # 2. domain是Trie中某条记录的后缀
         if node.is_pure():
             return NodeStatus.PROXY if node.has_proxy_child else NodeStatus.DIRECT
-        return node.status
+        return last_matched_status
 
     def view_tree(self):
         """查看 Trie 树结构"""
@@ -125,6 +133,32 @@ class DomainTrie:
         for txt, child in self.root.children.items():
             dfs(child, deque([txt]))
         return direct_ok_suffixes, proxy_needed_suffixes
+
+
+def load_memo(trie: DomainTrie):
+    whitelist_path = Path("whitelist.txt")
+    blacklist_path = Path("blacklist.txt")
+
+    def mark_as(pp: Path, stat: NodeStatus):
+        nonlocal trie
+        if pp.exists() and pp.is_file():
+            for each in pp.read_text(encoding="utf-8").splitlines():
+                trie.insert(each, stat)
+        else:
+            pp.touch()
+
+    mark_as(whitelist_path, NodeStatus.DIRECT)
+    mark_as(blacklist_path, NodeStatus.PROXY)
+
+
+def write_memo(trie: DomainTrie):
+    whitelist, blacklist = trie.compress_and_collect()
+    with open("whitelist.txt", "w", encoding="utf-8") as f:
+        for each in whitelist:
+            print(each, file=f)
+    with open("blacklist.txt", "w", encoding="utf-8") as f:
+        for each in blacklist:
+            print(each, file=f)
 
 
 def test():
