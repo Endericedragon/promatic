@@ -1,17 +1,4 @@
-chat
-cdn-go.cn
-com.cn
 bilibili.com
-fastly-edge.com
-accounts.firefox.com
-googleapis.com
 hdslb.com
-hembed.com
 mozilla.com
-weixin.qq.com
-wx.qq.com
 rbtab.com
-weglot.com
-facebook.net
-zencdn.net
-org

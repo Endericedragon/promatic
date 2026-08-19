@@ -9,7 +9,7 @@ from rw_utils import pipe, read_headers
 WRITE_LOCK: aio.Lock = aio.Lock()
 PORT: int = 33333
 BACKEND_PROXY_PORT: int = 32001
-TIMEOUT: float = 4
+TIMEOUT: float = 6.0
 CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 TRIE: DomainTrie = DomainTrie()
@@ -55,8 +55,10 @@ async def handle_http(
 ):
     """处理HTTP请求
 
-    先尝试直连服务器，若超时则换成代理访问
+    先尝试直连服务器，若超时则换成代理访问。
+    若port为None，则自动使用80端口。
     """
+    port = port or 80
     if TRIE.search(host) != NodeStatus.PROXY:
         try:
             target_reader, target_writer = await aio.wait_for(
@@ -71,8 +73,10 @@ async def handle_http(
             # 然后让用户和目标直接双向通信
             await aio.gather(pipe(target_reader, writer), pipe(reader, target_writer))
             return
-        except (aio.TimeoutError, OSError, Exception):
+        except aio.TimeoutError:
             eprint("[Timeout] {}:{}".format(host, port))
+        except Exception as e:
+            eprint("[Error HTTP {}:{}] {}: {}".format(host, port, type(e), e))
     # 超时后，换成代理访问
     try:
         proxy_reader, proxy_writer = await aio.open_connection(
@@ -86,7 +90,7 @@ async def handle_http(
         # 然后让用户和目标直接双向通信
         await aio.gather(pipe(proxy_reader, writer), pipe(reader, proxy_writer))
     except Exception as e:
-        eprint("[Error 89] {}:{}".format(type(e), e))
+        eprint("[Error 91] {}:{}".format(type(e), e))
     finally:
         writer.close()
 
@@ -115,8 +119,10 @@ async def handle_https(
             # 然后让用户和目标双向传输去
             await aio.gather(pipe(target_reader, writer), pipe(reader, target_writer))
             return
-        except (aio.TimeoutError, OSError, Exception):
+        except aio.TimeoutError:
             eprint("[Timeout] {}:{}".format(host, port))
+        except Exception as e:
+            eprint("[Error HTTPS {}:{}] {}: {}".format(host, port, type(e), e))
     try:
         proxy_reader, proxy_writer = await aio.open_connection(
             "127.0.0.1", BACKEND_PROXY_PORT
