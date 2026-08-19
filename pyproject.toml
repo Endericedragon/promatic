@@ -1,0 +1,19 @@
+[project]
+name = "promatic"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Endericedragon Fu", email = "fuze1007@163.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "sortedcontainers>=2.4.0",
+]
+
+[project.scripts]
+promatic = "promatic:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
