@@ -1,8 +1,3 @@
-www.alibow.cn
-www.google.com
-edge.microsoft.com
-abs.twimg.com
-pbs.twimg.com
-video.twimg.com
+google.com
+youtube.com
 x.com
-dev

@@ -1,14 +1,1 @@
-com.cn
-alicdn.com
 bilibili.com
-fastly-edge.com
-firefox.com
-frdic.com
-github.com
-githubassets.com
-hdslb.com
-mozilla.com
-qq.com
-rbtab.com
-net
-org

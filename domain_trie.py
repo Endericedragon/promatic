@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Deque, Dict, List
 
 from sortedcontainers import SortedDict
+import logging
 
 
 class NodeStatus(Enum):
@@ -60,7 +61,7 @@ class DomainTrie:
 
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
-        last_matched_status: NodeStatus = NodeStatus.BRANCH # 最长匹配到的非BRANCH规则
+        last_matched_status: NodeStatus = NodeStatus.BRANCH  # 最长匹配到的非BRANCH规则
         for part in parts:
             if part not in node.children:
                 # Trie 中仅存在domain的后缀，无法继续深入匹配
@@ -78,10 +79,6 @@ class DomainTrie:
 
     def view_tree(self):
         """查看 Trie 树结构"""
-        if self.root is None:
-            print()
-            return
-
         def dfs(node: TrieNode, path: Deque[str], depth: int = 0):
             if node.has_direct_child and node.has_proxy_child:
                 msg = ""
@@ -92,7 +89,7 @@ class DomainTrie:
             else:
                 msg = "LEAF"
 
-            print(
+            logging.debug(
                 "| " * depth
                 + ".".join(path)
                 + " [{}, {}]".format(repr(node.status), msg)
@@ -111,9 +108,10 @@ class DomainTrie:
 
         def dfs(node: TrieNode, path: Deque[str]):
             nonlocal direct_ok_suffixes, proxy_needed_suffixes
-            if node.is_pure():
+            if node.is_pure() and len(path) >= 2:
+                # 如果path长度仅为1，那也太宽泛了
                 cur_path = ".".join(path)
-                print("聚合规则: {}".format(cur_path))
+                logging.info("聚合规则: {}".format(cur_path))
                 if node.has_direct_child:
                     direct_ok_suffixes.append(cur_path)
                 else:
