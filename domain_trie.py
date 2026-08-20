@@ -53,10 +53,11 @@ class DomainTrie:
 
     def search(self, domain: str) -> NodeStatus:
         """搜索域名，返回其匹配或聚合后的状态
-
-        - 若 domain 是 Trie 中某记录的子域名（Trie 记录是 domain 的后缀），继承匹配到的最近父规则
-        - 若 domain 是 Trie 中多条记录的公共后缀，当这些子记录全为代理/直连时，聚合返回对应状态
+        
         - 若 domain 精确匹配已有记录，返回该记录的状态
+        - 若 domain 是 Trie 中某记录的子域名（Trie 记录是 domain 的后缀），继承匹配到的最近非BRANCH父规则（若有）
+        - 若 domain 是 Trie 中多条记录的公共后缀，且这些子记录全为代理/直连时，聚合返回对应状态
+        - 否则返回 BRANCH
         """
 
         parts = reversed(domain.lower().split("."))  # 反转列表
