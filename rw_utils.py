@@ -47,9 +47,9 @@ async def pipe(
             OSError,
             TimeoutError,
             aio.TimeoutError,
-        ):
+        ) as e:
             if is_in_remote:
-                raise FakeDirectError("Read failed!")
+                raise FakeDirectError(f"Read failed with {type(e).__name__}")
             break
         try:  # 单独处理写异常
             p_out.write(data)
@@ -60,9 +60,9 @@ async def pipe(
             OSError,
             TimeoutError,
             aio.TimeoutError,
-        ):
+        ) as e:
             if is_out_remote:
-                raise FakeDirectError("Write failed!")
+                raise FakeDirectError(f"Write failed with {type(e).__name__}")
             break
     try:
         if p_out.can_write_eof():
@@ -70,35 +70,6 @@ async def pipe(
             await p_out.drain()
     except Exception as e:
         LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))
-
-    # try:
-    #     while data := await aio.wait_for(p_in.read(8192), MAX_TIMEOUT):
-    #         p_out.write(data)
-    #         await p_out.drain()
-    #     # 传输结束，准备关闭p_out
-    #     if p_out.can_write_eof():
-    #         p_out.write_eof()
-    #         await p_out.drain()
-    # except aio.CancelledError:
-    #     pass
-    # except (
-    #     ConnectionResetError,
-    #     BrokenPipeError,
-    #     OSError,
-    #     TimeoutError,
-    #     aio.TimeoutError,
-    # ):
-    #     if is_in_remote or is_out_remote:
-    #         if is_in_remote and is_out_remote:
-    #             msg = "Both streams"
-    #         elif is_in_remote:
-    #             msg = "Input stream"
-    #         else:
-    #             msg = "Output stream"
-    #         raise FakeDirectError(msg + " unavailable, we are fooled!")
-    #     # 如果是客户端断开（浏览器关掉页面等），属于正常现象，静默处理
-    # except Exception as e:
-    #     LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))
 
 
 async def bidirectional_pipe(

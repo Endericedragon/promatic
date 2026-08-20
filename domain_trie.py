@@ -116,6 +116,7 @@ class DomainTrie:
                 #! 注意，pure也可能是因为node下没有子节点！
                 # 如果path长度仅为1，那也太宽泛了
                 cur_path = ".".join(path)
+                aggregated_as: NodeStatus | None = None
                 if node.has_direct_child:
                     direct_ok_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.DIRECT
