@@ -26,8 +26,8 @@ handler.setFormatter(
         log_colors={
             "DEBUG": "cyan",
             "INFO": "green",
-            "WARNING": "orange",
-            "ERROR": "red",
+            "WARNING": "fg_202",
+            "ERROR": "bg_1",
             "CRITICAL": "bold_red",
         },
     )
