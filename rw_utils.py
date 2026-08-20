@@ -1,7 +1,10 @@
 import asyncio as aio
+from log_utils import get_logger
+
+LOGGER = get_logger()
 
 
-async def pipe(p_in: aio.StreamReader, p_out: aio.StreamWriter):
+async def pipe(p_in: aio.StreamReader, p_out: aio.StreamWriter, helper_msg: str = ""):
     """将p_in中的数据写入p_out。当p_in读到EOF时，关掉p_out"""
     try:
         while data := await p_in.read(8192):
@@ -11,9 +14,14 @@ async def pipe(p_in: aio.StreamReader, p_out: aio.StreamWriter):
         if p_out.can_write_eof():
             p_out.write_eof()
             await p_out.drain()
+    except Exception as e:
+        LOGGER.error("[PIPING {}] Unknown error: {}".format(helper_msg, type(e).__name__))
     finally:
-        p_out.close()
-        await p_out.wait_closed()
+        try:
+            p_out.close()
+            await p_out.wait_closed()
+        except Exception as e:
+            LOGGER.error("[PIPED {}] Unknown error: {}".format(helper_msg, type(e).__name__))
 
 
 async def read_headers(reader: aio.StreamReader) -> bytearray:
