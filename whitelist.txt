@@ -1,6 +1,0 @@
-rbtab.com
-firefox.com
-mozilla.com
-mozilla.org
-fastly-edge.com
-tampermonkey.net

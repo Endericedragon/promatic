@@ -1,11 +1,7 @@
 csdn.net
 baidu.com
-pstatp.com
 firefox.com
 gitcode.com
-fastly-edge.com
-tampermonkey.net
-telemetry.mozilla.org
 bilibili.com
 rbtab.com
 csdnimg.cn

@@ -113,11 +113,14 @@ class DomainTrie:
             if node.is_pure() and len(path) >= 2:
                 # 如果path长度仅为1，那也太宽泛了
                 cur_path = ".".join(path)
-                logging.info("聚合规则: {}".format(cur_path))
                 if node.has_direct_child:
                     direct_ok_suffixes.append(cur_path)
+                    aggregated_as = NodeStatus.DIRECT
                 else:
                     proxy_needed_suffixes.append(cur_path)
+                    aggregated_as = NodeStatus.PROXY
+                if aggregated_as.value > 0:
+                    logging.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
             else:
                 cur_path = ".".join(path)
                 match node.status:

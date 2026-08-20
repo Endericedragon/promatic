@@ -3,13 +3,12 @@ import signal
 from sys import platform as current_platform
 from urllib.parse import urlparse
 
-from log_utils import get_logger
 from domain_trie import DomainTrie, NodeStatus, load_memo, write_memo
-from rw_utils import pipe, read_headers
+from log_utils import get_logger
+from rw_utils import bidirectional_pipe, read_headers, safe_close
 
-PORT: int = 33333
-BACKEND_PROXY_PORT: int = 32001
-TIMEOUT: float = 8.0
+from consts import MAX_RETRY, PORT, BACKEND_PROXY_PORT, MAX_TIMEOUT, EXP_TIMEOUT
+
 CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 TRIE: DomainTrie = DomainTrie()
@@ -29,44 +28,47 @@ async def handle_http(
     若port为None，则自动使用80端口。
     """
     port = port or 80
-    if TRIE.search(host) != NodeStatus.PROXY:
+    use_proxy = TRIE.search(host) == NodeStatus.PROXY
+    # 1. 先尝试直连服务器
+    if not use_proxy:
+        for i in range(MAX_RETRY):
+            try:
+                target_reader, target_writer = await aio.wait_for(
+                    aio.open_connection(host, port),
+                    timeout=int(EXP_TIMEOUT ** (i + 1)),
+                )
+                # 将域名记录为直连
+                LOGGER.info("[DH] {}:{}".format(host, port))
+                TRIE.insert(host, NodeStatus.DIRECT)
+                break
+            except (aio.TimeoutError, OSError) as e:
+                LOGGER.warning(f"[DHErr] {type(e).__name__} {host}:{port}")
+                use_proxy = True
+    # 2. 若直连失败或命中代理规则
+    if use_proxy:
         try:
             target_reader, target_writer = await aio.wait_for(
-                aio.open_connection(host, port), timeout=TIMEOUT
+                aio.open_connection("127.0.0.1", BACKEND_PROXY_PORT),
+                timeout=MAX_TIMEOUT,
             )
-            # 把后端传过来的头部直接丢给目标
-            target_writer.write(header_bytes)
-            await target_writer.drain()
-            # 将域名记录为直连
-            LOGGER.info("[DH] {}:{}".format(host, port))
-            TRIE.insert(host, NodeStatus.DIRECT)
-            # 然后让用户和目标直接双向通信
-            await aio.gather(pipe(target_reader, writer), pipe(reader, target_writer))
-            return
-        except aio.TimeoutError:
-            LOGGER.warning("[Timeout] {}:{}".format(host, port))
+            # 将域名记录为代理
+            LOGGER.info("[PH] {}:{}".format(host, port))
+            TRIE.insert(host, NodeStatus.PROXY)
         except Exception as e:
-            LOGGER.warning(
-                "[DHErr {}:{}] {}: {}".format(host, port, type(e).__name__, e)
-            )
-    # 超时后，换成代理访问
+            LOGGER.warning(f"[PHErr] {type(e).__name__} {host}:{port}")
+            return
+    # 3. 开始通信
     try:
-        proxy_reader, proxy_writer = await aio.open_connection(
-            "127.0.0.1", BACKEND_PROXY_PORT
-        )
-        proxy_writer.write(header_bytes)
-        await proxy_writer.drain()
-        # 将域名记录为代理
-        TRIE.insert(host, NodeStatus.PROXY)
-        # 然后让用户和目标直接双向通信
-        LOGGER.info("[PH] {}:{}".format(host, port))
-        await aio.gather(pipe(proxy_reader, writer), pipe(reader, proxy_writer))
+        # 3.1 把后端传过来的头部直接丢给目标
+        target_writer.write(header_bytes)
+        await target_writer.drain()
+        # 3.2 然后让用户和目标直接双向通信
+        await bidirectional_pipe(reader, writer, target_reader, target_writer)
     except Exception as e:
-        LOGGER.warning(
-            "[PHErr {}:{}] {}: {}".format(host, port, type(e).__name__, e)
-        )
-    finally:
-        writer.close()
+        LOGGER.warning(f"[HErr] {type(e).__name__} {host}:{port}")
+        if not use_proxy:
+            # 3.3 如果命中直连规则但无法成功的，记为代理
+            TRIE.insert(host, NodeStatus.PROXY)
 
 
 async def handle_https(
@@ -79,54 +81,55 @@ async def handle_https(
 
     先尝试直连服务器，若超时则换成代理访问
     """
-    if TRIE.search(host) != NodeStatus.PROXY:
+    port = port or 443
+    use_proxy = TRIE.search(host) == NodeStatus.PROXY
+    # 1. 先尝试直连服务器
+    if not use_proxy:
+        for i in range(MAX_RETRY):
+            try:
+                target_reader, target_writer = await aio.wait_for(
+                    aio.open_connection(host, port),
+                    timeout=int(EXP_TIMEOUT ** (i + 1)),
+                )
+                # 将域名记录为直连
+                LOGGER.info("[DHS] {}:{}".format(host, port))
+                TRIE.insert(host, NodeStatus.DIRECT)
+                break
+            except (aio.TimeoutError, OSError) as e:
+                LOGGER.warning(f"[DHSErr 1] {type(e).__name__} {host}:{port}")
+                use_proxy = True
+    # 2. 若直连失败或命中代理规则
+    if use_proxy:
         try:
-            target_reader, target_writer = await aio.wait_for(
-                aio.open_connection(host, port), timeout=TIMEOUT
+            target_reader, target_writer = await aio.open_connection(
+                "127.0.0.1", BACKEND_PROXY_PORT
             )
-            # 回头告诉用户，代理连接已建立
-            writer.write(CONN_ESABLISHED.encode("latin1"))
-            await writer.drain()
-            # 将域名记录为直连
-            LOGGER.info("[DHS] {}:{}".format(host, port))
-            TRIE.insert(host, NodeStatus.DIRECT)
-            # 然后让用户和目标双向传输去
-            await aio.gather(pipe(target_reader, writer), pipe(reader, target_writer))
-            return
-        except aio.TimeoutError:
-            LOGGER.warning("[Timeout] {}:{}".format(host, port))
-        except Exception as e:
-            LOGGER.warning(
-                "[DHSErr {}:{}] {}: {}".format(host, port, type(e).__name__, e)
-            )
-    try:
-        proxy_reader, proxy_writer = await aio.open_connection(
-            "127.0.0.1", BACKEND_PROXY_PORT
-        )
-        # 构造代理请求
-        PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
-        proxy_writer.write(PROXY_REQUEST.encode("latin1"))
-        await proxy_writer.drain()
-        # 看看代理返回了啥
-        result = await read_headers(proxy_reader)
-        if result and b"200" in result:
-            # 回头告诉用户，代理连接已建立
-            writer.write(CONN_ESABLISHED.encode("latin1"))
-            await writer.drain()
-            # 将域名记录为代理
+            # 2.1 构造代理请求
+            PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
+            target_writer.write(PROXY_REQUEST.encode("latin1"))
+            await target_writer.drain()
+            # 2.2 看看代理返回了啥，若包含200则成功
+            result = await read_headers(target_reader)
+            if not result or b"200" not in result:
+                raise Exception()  # 2.2.1 强制跳转到except
+            # 2.3 将域名记录为代理
             LOGGER.info("[PHS] {}:{}".format(host, port))
             TRIE.insert(host, NodeStatus.PROXY)
-            # 然后让用户和目标双向传输去
-            await aio.gather(pipe(proxy_reader, writer), pipe(reader, proxy_writer))
-        else:
-            writer.write(result)
-            await writer.drain()
+        except Exception as e:
+            LOGGER.warning(f"[PHSErr 1] {type(e).__name__} {host}:{port}")
+            return
+    # 3. 开始通信
+    try:
+        # 3.1 回头告诉用户，代理连接已建立
+        writer.write(CONN_ESABLISHED.encode("latin1"))
+        await writer.drain()
+        # 3.2 然后让用户和目标直接双向通信
+        await bidirectional_pipe(reader, writer, target_reader, target_writer)
     except Exception as e:
-        LOGGER.warning(
-            "[PHSErr {}:{}] {}: {}".format(host, port, type(e).__name__, e)
-        )
-    finally:
-        writer.close()
+        LOGGER.warning(f"[HSErr] {type(e).__name__} {host}:{port}")
+        if not use_proxy:
+            # 3.3 如果命中直连规则但无法成功的，记为代理
+            TRIE.insert(host, NodeStatus.PROXY)
 
 
 async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter):
@@ -134,32 +137,35 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
 
     先获取其请求头，判断请求是HTTP请求还是HTTPS请求，然后交由对应函数处理。
     """
-    header_bytes = await read_headers(reader)
-    if not header_bytes:
-        writer.close()
-        return
-    header = header_bytes.decode("latin1")
-    parts = header.splitlines()[0].split(" ", 2)
-    if len(parts) != 3:
-        LOGGER.error("[Header Parse Failed] Invalid request line: {}".format(header))
-        writer.close()
-        return
-    method, path, _ = parts
-    match method:
-        case "GET":
-            # HTTP
-            parsed = urlparse(path)
-            assert parsed.hostname is not None
-            await handle_http(
-                reader, writer, parsed.hostname, parsed.port, header_bytes
+    try:
+        header_bytes = await read_headers(reader)
+        if not header_bytes:
+            return
+        header = header_bytes.decode("latin1")
+        parts = header.splitlines()[0].split(" ", 2)
+        if len(parts) != 3:
+            LOGGER.error(
+                "[Header Parse Failed] Invalid request line: {}".format(header)
             )
-        case "CONNECT":
-            # HTTPS
-            host, port_str = path.split(":", 1)
-            port = int(port_str)
-            await handle_https(reader, writer, host, port)
-        case _:
-            assert False, "Unreachable!"
+            return
+        method, path, _ = parts
+        match method:
+            case "CONNECT":
+                # HTTPS
+                host, port_str = path.split(":", 1)
+                port = int(port_str)
+                await handle_https(reader, writer, host, port)
+            case _:
+                # HTTP请求，如GET、POST等
+                parsed = urlparse(path)
+                assert parsed.hostname is not None
+                await handle_http(
+                    reader, writer, parsed.hostname, parsed.port, header_bytes
+                )
+    except Exception as e:
+        LOGGER.error(f"[ServerErr] {type(e).__name__}: {e}")
+    finally:
+        await safe_close(writer)
 
 
 async def main():
