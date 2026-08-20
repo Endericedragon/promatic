@@ -49,7 +49,7 @@ async def pipe(
             aio.TimeoutError,
         ):
             if is_in_remote:
-                raise FakeDirectError("Input stream unavailable, We are fooled!")
+                raise FakeDirectError("Read failed!")
             break
         try:  # 单独处理写异常
             p_out.write(data)
@@ -62,7 +62,7 @@ async def pipe(
             aio.TimeoutError,
         ):
             if is_out_remote:
-                raise FakeDirectError("Output stream unavailable, We are fooled!")
+                raise FakeDirectError("Write failed!")
             break
     try:
         if p_out.can_write_eof():
@@ -95,7 +95,7 @@ async def pipe(
     #             msg = "Input stream"
     #         else:
     #             msg = "Output stream"
-    #         raise FakeDirectError(msg + " unavailable, We are fooled!")
+    #         raise FakeDirectError(msg + " unavailable, we are fooled!")
     #     # 如果是客户端断开（浏览器关掉页面等），属于正常现象，静默处理
     # except Exception as e:
     #     LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))

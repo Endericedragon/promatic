@@ -3,7 +3,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Deque, Dict, List
 
-from sortedcontainers import SortedDict
 import logging
 
 
@@ -18,7 +17,7 @@ class NodeStatus(Enum):
 
 class TrieNode:
     def __init__(self, nstat: NodeStatus):
-        self.children: Dict[str, "TrieNode"] = SortedDict()
+        self.children: Dict[str, "TrieNode"] = dict()
         self.status = nstat
         self.has_proxy_child: bool = False
         self.has_direct_child: bool = False
@@ -75,7 +74,10 @@ class DomainTrie:
             return node.status
         # 2. domain是Trie中某条记录的后缀
         if node.is_pure():
-            return NodeStatus.PROXY if node.has_proxy_child else NodeStatus.DIRECT
+            if node.has_direct_child:
+                return NodeStatus.DIRECT
+            elif node.has_proxy_child:
+                return NodeStatus.PROXY
         return last_matched_status
 
     def view_tree(self):
@@ -111,15 +113,16 @@ class DomainTrie:
         def dfs(node: TrieNode, path: Deque[str]):
             nonlocal direct_ok_suffixes, proxy_needed_suffixes
             if node.is_pure() and len(path) >= 2:
+                #! 注意，pure也可能是因为node下没有子节点！
                 # 如果path长度仅为1，那也太宽泛了
                 cur_path = ".".join(path)
                 if node.has_direct_child:
                     direct_ok_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.DIRECT
-                else:
+                elif node.has_proxy_child:
                     proxy_needed_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.PROXY
-                if aggregated_as.value > 0:
+                if aggregated_as and aggregated_as.value > 0:
                     logging.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
             else:
                 cur_path = ".".join(path)
@@ -157,10 +160,10 @@ def load_memo(trie: DomainTrie):
 def write_memo(trie: DomainTrie):
     whitelist, blacklist = trie.compress_and_collect()
     with open("whitelist.txt", "w", encoding="utf-8") as f:
-        for each in sorted(whitelist, key=lambda x: (len(x), x)):
+        for each in sorted(whitelist, key=lambda x: (-len(x), x)):
             print(each, file=f)
     with open("blacklist.txt", "w", encoding="utf-8") as f:
-        for each in sorted(blacklist, key=lambda x: (len(x), x)):
+        for each in sorted(blacklist, key=lambda x: (-len(x), x)):
             print(each, file=f)
 
 
