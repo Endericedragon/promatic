@@ -31,19 +31,18 @@ async def handle_http(
     use_proxy = TRIE.search(host) == NodeStatus.PROXY
     # 1. 先尝试直连服务器
     if not use_proxy:
-        for i in range(MAX_RETRY):
-            try:
-                target_reader, target_writer = await aio.wait_for(
-                    aio.open_connection(host, port),
-                    timeout=int(EXP_TIMEOUT ** (i + 1)),
-                )
-                # 将域名记录为直连
-                LOGGER.info("[DH] {}:{}".format(host, port))
-                TRIE.insert(host, NodeStatus.DIRECT)
-                break
-            except (aio.TimeoutError, OSError) as e:
-                LOGGER.warning(f"[DHErr] {type(e).__name__} {host}:{port}")
-                use_proxy = True
+        try:
+            target_reader, target_writer = await aio.wait_for(
+                aio.open_connection(host, port),
+                timeout=MAX_TIMEOUT,
+            )
+            # 将域名记录为直连
+            LOGGER.info("[DH] {}:{}".format(host, port))
+            TRIE.insert(host, NodeStatus.DIRECT)
+        except (aio.TimeoutError, OSError) as e:
+            # 最后一次重试失败，记录日志并切换为代理
+            LOGGER.warning(f"[DHErr] {type(e).__name__} {host}:{port}")
+            use_proxy = True
     # 2. 若直连失败或命中代理规则
     if use_proxy:
         try:
@@ -64,7 +63,7 @@ async def handle_http(
         await target_writer.drain()
         # 3.2 然后让用户和目标直接双向通信
         await bidirectional_pipe(reader, writer, target_reader, target_writer)
-    except Exception as e:
+    except Exception as e:  # 只会被FakeDirectError触发
         LOGGER.warning(f"[HErr] {type(e).__name__} {host}:{port}")
         if not use_proxy:
             # 3.3 如果命中直连规则但无法成功的，记为代理
@@ -85,19 +84,19 @@ async def handle_https(
     use_proxy = TRIE.search(host) == NodeStatus.PROXY
     # 1. 先尝试直连服务器
     if not use_proxy:
-        for i in range(MAX_RETRY):
-            try:
-                target_reader, target_writer = await aio.wait_for(
-                    aio.open_connection(host, port),
-                    timeout=int(EXP_TIMEOUT ** (i + 1)),
-                )
-                # 将域名记录为直连
-                LOGGER.info("[DHS] {}:{}".format(host, port))
-                TRIE.insert(host, NodeStatus.DIRECT)
-                break
-            except (aio.TimeoutError, OSError) as e:
-                LOGGER.warning(f"[DHSErr 1] {type(e).__name__} {host}:{port}")
-                use_proxy = True
+        try:
+            target_reader, target_writer = await aio.wait_for(
+                aio.open_connection(host, port),
+                timeout=MAX_TIMEOUT,
+            )
+            # 将域名记录为直连
+            LOGGER.info("[DHS] {}:{}".format(host, port))
+            TRIE.insert(host, NodeStatus.DIRECT)
+        except (aio.TimeoutError, OSError) as e:
+            # 最后一次重试失败，记录日志并切换为代理
+            LOGGER.warning(f"[DHSErr] {type(e).__name__} {host}:{port}")
+            use_proxy = True
+
     # 2. 若直连失败或命中代理规则
     if use_proxy:
         try:
@@ -116,7 +115,7 @@ async def handle_https(
             LOGGER.info("[PHS] {}:{}".format(host, port))
             TRIE.insert(host, NodeStatus.PROXY)
         except Exception as e:
-            LOGGER.warning(f"[PHSErr 1] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(f"[PHSErr] {type(e).__name__} {host}:{port}")
             return
     # 3. 开始通信
     try:
@@ -125,8 +124,8 @@ async def handle_https(
         await writer.drain()
         # 3.2 然后让用户和目标直接双向通信
         await bidirectional_pipe(reader, writer, target_reader, target_writer)
-    except Exception as e:
-        LOGGER.warning(f"[HSErr] {type(e).__name__} {host}:{port}")
+    except Exception as e:  # 只会被FakeDirectError触发
+        LOGGER.warning(f"[HSErr] {type(e).__name__} {host}:{port} {e}")
         if not use_proxy:
             # 3.3 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)

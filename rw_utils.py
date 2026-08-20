@@ -36,22 +36,69 @@ async def pipe(
         is_out_remote: 输出流是否为远端
     """
 
-    try:
-        while data := await aio.wait_for(p_in.read(8192), MAX_TIMEOUT):
+    while True:
+        try:  # 单独处理读异常
+            data = await aio.wait_for(p_in.read(8192), MAX_TIMEOUT)
+            if not data:
+                break
+        except (
+            ConnectionResetError,
+            BrokenPipeError,
+            OSError,
+            TimeoutError,
+            aio.TimeoutError,
+        ):
+            if is_in_remote:
+                raise FakeDirectError("Input stream unavailable, We are fooled!")
+            break
+        try:  # 单独处理写异常
             p_out.write(data)
             await p_out.drain()
-        # 传输结束，准备关闭p_out
+        except (
+            ConnectionResetError,
+            BrokenPipeError,
+            OSError,
+            TimeoutError,
+            aio.TimeoutError,
+        ):
+            if is_out_remote:
+                raise FakeDirectError("Output stream unavailable, We are fooled!")
+            break
+    try:
         if p_out.can_write_eof():
             p_out.write_eof()
             await p_out.drain()
-    except aio.CancelledError:
-        pass
-    except (ConnectionResetError, BrokenPipeError, aio.TimeoutError, OSError):
-        if is_in_remote or is_out_remote:
-            raise FakeDirectError("We are fooled!")
-        # 如果是客户端断开（浏览器关掉页面等），属于正常现象，静默处理
     except Exception as e:
         LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))
+
+    # try:
+    #     while data := await aio.wait_for(p_in.read(8192), MAX_TIMEOUT):
+    #         p_out.write(data)
+    #         await p_out.drain()
+    #     # 传输结束，准备关闭p_out
+    #     if p_out.can_write_eof():
+    #         p_out.write_eof()
+    #         await p_out.drain()
+    # except aio.CancelledError:
+    #     pass
+    # except (
+    #     ConnectionResetError,
+    #     BrokenPipeError,
+    #     OSError,
+    #     TimeoutError,
+    #     aio.TimeoutError,
+    # ):
+    #     if is_in_remote or is_out_remote:
+    #         if is_in_remote and is_out_remote:
+    #             msg = "Both streams"
+    #         elif is_in_remote:
+    #             msg = "Input stream"
+    #         else:
+    #             msg = "Output stream"
+    #         raise FakeDirectError(msg + " unavailable, We are fooled!")
+    #     # 如果是客户端断开（浏览器关掉页面等），属于正常现象，静默处理
+    # except Exception as e:
+    #     LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))
 
 
 async def bidirectional_pipe(
