@@ -9,7 +9,7 @@ from rw_utils import pipe, read_headers
 
 PORT: int = 33333
 BACKEND_PROXY_PORT: int = 32001
-TIMEOUT: float = 10.0
+TIMEOUT: float = 8.0
 CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 TRIE: DomainTrie = DomainTrie()
@@ -38,7 +38,7 @@ async def handle_http(
             target_writer.write(header_bytes)
             await target_writer.drain()
             # 将域名记录为直连
-            LOGGER.info("[Direct] {}:{}".format(host, port))
+            LOGGER.info("[DH] {}:{}".format(host, port))
             TRIE.insert(host, NodeStatus.DIRECT)
             # 然后让用户和目标直接双向通信
             await aio.gather(pipe(target_reader, writer), pipe(reader, target_writer))
@@ -47,7 +47,7 @@ async def handle_http(
             LOGGER.warning("[Timeout] {}:{}".format(host, port))
         except Exception as e:
             LOGGER.warning(
-                "[HTTP Direct {}:{}] {}: {}".format(host, port, type(e).__name__, e)
+                "[DHErr {}:{}] {}: {}".format(host, port, type(e).__name__, e)
             )
     # 超时后，换成代理访问
     try:
@@ -88,7 +88,7 @@ async def handle_https(
             writer.write(CONN_ESABLISHED.encode("latin1"))
             await writer.drain()
             # 将域名记录为直连
-            LOGGER.info("[Direct] {}:{}".format(host, port))
+            LOGGER.info("[DHS] {}:{}".format(host, port))
             TRIE.insert(host, NodeStatus.DIRECT)
             # 然后让用户和目标双向传输去
             await aio.gather(pipe(target_reader, writer), pipe(reader, target_writer))
@@ -97,7 +97,7 @@ async def handle_https(
             LOGGER.warning("[Timeout] {}:{}".format(host, port))
         except Exception as e:
             LOGGER.warning(
-                "[HTTPS Direct {}:{}] {}: {}".format(host, port, type(e).__name__, e)
+                "[DHSErr {}:{}] {}: {}".format(host, port, type(e).__name__, e)
             )
     try:
         proxy_reader, proxy_writer = await aio.open_connection(

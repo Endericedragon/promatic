@@ -1,12 +1,6 @@
-csdn.net
-baidu.com
-pstatp.com
+rbtab.com
 firefox.com
-gitcode.com
+mozilla.com
+mozilla.org
 fastly-edge.com
 tampermonkey.net
-telemetry.mozilla.org
-bilibili.com
-rbtab.com
-csdnimg.cn
-www.mozilla.org

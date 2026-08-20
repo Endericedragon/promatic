@@ -14,14 +14,17 @@ async def pipe(p_in: aio.StreamReader, p_out: aio.StreamWriter, helper_msg: str 
         if p_out.can_write_eof():
             p_out.write_eof()
             await p_out.drain()
+    except ConnectionResetError:
+        raise ConnectionResetError("Connection reset by peer while piping")
     except Exception as e:
-        LOGGER.error("[PIPING {}] Unknown error: {}".format(helper_msg, type(e).__name__))
+        LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))
     finally:
+        # 关闭p_out，忽略关闭期间出问题，防止被误判为需要代理
         try:
             p_out.close()
             await p_out.wait_closed()
         except Exception as e:
-            LOGGER.error("[PIPED {}] Unknown error: {}".format(helper_msg, type(e).__name__))
+            LOGGER.error("[PIPED {}] {}".format(helper_msg, type(e).__name__))
 
 
 async def read_headers(reader: aio.StreamReader) -> bytearray:
