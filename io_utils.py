@@ -63,11 +63,6 @@ ACCEPTABLE_EXCS = (
 )
 
 
-@async_retry(ACCEPTABLE_EXCS)
-async def try_read(reader: aio.StreamReader):
-    return await aio.wait_for(reader.read(8192), timeout=MAX_TIMEOUT)
-
-
 async def pipe(
     p_in: aio.StreamReader,
     p_out: aio.StreamWriter,
@@ -75,7 +70,9 @@ async def pipe(
     is_in_remote: bool,
     is_out_remote: bool,
 ):
-    """将p_in中的数据写入p_out。当p_in读到EOF时，尝试向p_out发送EOF
+    """将p_in中的数据写入p_out，返回从p_in接收到的字节数。
+    
+    当p_in读到EOF时，尝试向p_out发送EOF
 
     Args:
         p_in: 输入流
@@ -84,30 +81,39 @@ async def pipe(
         is_in_remote: 输入流是否为远端
         is_out_remote: 输出流是否为远端
     """
-
+    recv_byte: int = 0  # 已接收的字节数
     while True:
         try:  # 单独处理读异常
-            # data = await aio.wait_for(p_in.read(8192), MAX_TIMEOUT)
-            data = await try_read(p_in)
+            if is_in_remote and recv_byte == 0:
+                # 首包通信，设置超时
+                data = await aio.wait_for(p_in.read(8192), timeout=MAX_TIMEOUT)
+            else:
+                # 说明首包通信已成功，不再设置超时
+                data = await p_in.read(8192)
             if not data:
                 break
+            recv_byte += len(data)
         except ACCEPTABLE_EXCS as e:
-            if is_in_remote:
-                raise FakeDirectError(f"Read failed with {type(e).__name__}")
+            if is_in_remote and recv_byte == 0:
+                # 远端读取失败，且从未收到任何数据
+                raise FakeDirectError(f"{type(e).__name__} during reading")
             break
         try:  # 单独处理写异常
             p_out.write(data)
             await p_out.drain()
         except ACCEPTABLE_EXCS as e:
             if is_out_remote:
-                raise FakeDirectError(f"Write failed with {type(e).__name__}")
+                raise FakeDirectError(f"{type(e).__name__} during writing")
             break
+    # 传输完毕，准备发送EOF“半关闭”连接
     try:
         if p_out.can_write_eof():
             p_out.write_eof()
             await p_out.drain()
     except Exception as e:
         LOGGER.error("[PIPING {}] {}".format(helper_msg, type(e).__name__))
+
+    return recv_byte
 
 
 async def bidirectional_pipe(
@@ -133,3 +139,8 @@ async def bidirectional_pipe(
         exec = task.exception()
         if isinstance(exec, FakeDirectError):
             raise exec
+    # 浏览器超时
+    client_bytes = task1.result() if not task1.exception() else 0
+    remote_bytes = task2.result() if not task2.exception() else 0
+    if client_bytes > 0 and remote_bytes == 0:
+        raise FakeDirectError("Remote sent nothing")

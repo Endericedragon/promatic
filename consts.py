@@ -9,7 +9,7 @@ BACKEND_PROXY_PORT: int = 32001
 CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 
-MAX_TIMEOUT: float = 6.0  # 常数超时时间
+MAX_TIMEOUT: float = 4.0  # 常数超时时间
 MAX_RETRY: int = 4
 
 P = ParamSpec("P")

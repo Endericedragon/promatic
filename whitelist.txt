@@ -1,7 +1,8 @@
-addons.mozilla.org
-open.weixin.qq.com
-work.weixin.qq.com
-live.bilibili.com
+tampermonkey.net
+bilibili.com
 biligame.com
+firefox.com
 mozilla.com
+mozilla.org
 rbtab.com
+qq.com

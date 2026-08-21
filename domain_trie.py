@@ -16,17 +16,30 @@ class NodeStatus(Enum):
 
 
 class TrieNode:
+    """域名树节点
+
+    Attributes:
+        children: 子节点
+        status: 节点状态
+        count_proxy: 节点及其子节点中，代理节点的数量
+        count_direct: 节点及其子节点中，直连节点的数量
+    """
+
     def __init__(self, nstat: NodeStatus):
         self.children: Dict[str, "TrieNode"] = dict()
         self.status = nstat
-        self.has_proxy_child: bool = False
-        self.has_direct_child: bool = False
+        self.count_proxy: int = 0
+        self.count_direct: int = 0
 
-    def is_pure(self) -> bool:
-        """判断该节点的子节点是否为纯代理/直连节点"""
-        return self.has_proxy_child != self.has_direct_child or (
-            not self.has_direct_child and not self.has_proxy_child
-        )
+    @property
+    def is_pure_proxy(self) -> bool:
+        """判断该节点及其子节点是否全为代理节点"""
+        return self.count_proxy > 0 and self.count_direct == 0
+
+    @property
+    def is_pure_direct(self) -> bool:
+        """判断该节点及其子节点是否全为直连节点"""
+        return self.count_proxy == 0 and self.count_direct > 0
 
 
 class DomainTrie:
@@ -37,18 +50,33 @@ class DomainTrie:
         """倒序插入域名，例如 a.google.com -> 插入路径: com -> google -> a"""
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
+        path_nodes: List[TrieNode] = [node]  # 插入路径，包含最终节点
+
         for part in parts:
             if part not in node.children:
                 # 默认插入叶子节点
                 node.children[part] = TrieNode(NodeStatus.BRANCH)
-            # 该节点下是否全为代理/直连节点？
-            if status == NodeStatus.DIRECT:
-                node.has_direct_child = True
-            elif status == NodeStatus.PROXY:
-                node.has_proxy_child = True
+            # 前往其对应的子节点
             node = node.children[part]
+            path_nodes.append(node)
 
+        old_status = node.status
+        if old_status == status:
+            # 无需更改任何信息
+            return
+        # 说明新插入的域名更改了状态，需要更新路径上各个节点的计数
         node.status = status
+        for nn in path_nodes:
+            # 1. 删除旧状态
+            if old_status == NodeStatus.PROXY:
+                nn.count_proxy -= 1
+            elif old_status == NodeStatus.DIRECT:
+                nn.count_direct -= 1
+            # 2. 添加新状态
+            if status == NodeStatus.PROXY:
+                nn.count_proxy += 1
+            elif status == NodeStatus.DIRECT:
+                nn.count_direct += 1
 
     def search(self, domain: str) -> NodeStatus:
         """搜索域名，返回其匹配或聚合后的状态
@@ -73,11 +101,10 @@ class DomainTrie:
         if node.status != NodeStatus.BRANCH:
             return node.status
         # 2. domain是Trie中某条记录的后缀
-        if node.is_pure():
-            if node.has_direct_child:
-                return NodeStatus.DIRECT
-            elif node.has_proxy_child:
-                return NodeStatus.PROXY
+        if node.is_pure_direct:
+            return NodeStatus.DIRECT
+        elif node.is_pure_proxy:
+            return NodeStatus.PROXY
         # 3. 实在没辙
         return last_matched_status
 
@@ -85,11 +112,11 @@ class DomainTrie:
         """查看 Trie 树结构"""
 
         def dfs(node: TrieNode, path: Deque[str], depth: int = 0):
-            if node.has_direct_child and node.has_proxy_child:
+            if node.count_direct and node.count_proxy:
                 msg = ""
-            elif node.has_direct_child:
+            elif node.count_direct:
                 msg = "PureDirect"
-            elif node.has_proxy_child:
+            elif node.count_proxy:
                 msg = "PureProxy"
             else:
                 msg = "LEAF"
@@ -113,36 +140,42 @@ class DomainTrie:
 
         def dfs(node: TrieNode, path: Deque[str]):
             nonlocal direct_ok_suffixes, proxy_needed_suffixes
-            if node.is_pure() and len(path) >= 2:
-                #! 注意，pure也可能是因为node下没有子节点！
-                # 如果path长度仅为1，那也太宽泛了
-                cur_path = ".".join(path)
-                aggregated_as: NodeStatus | None = None
-                if node.has_direct_child:
+            # 0. 准备
+            if node.count_direct + node.count_proxy == 0:
+                # 节点无效（自己是BRANCH，同时其下要么没子节点，要么也都是BRANCH）
+                return
+            cur_path = ".".join(path)
+            #  1. 可以聚合吗？
+            aggregated_as: NodeStatus = NodeStatus.BRANCH
+            if len(path) > 1:
+                # 1.1 可以聚合成直连规则吗？
+                if node.is_pure_direct:
                     direct_ok_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.DIRECT
-                elif node.has_proxy_child:
+                # 1.2 可以聚合成代理规则吗？
+                if node.is_pure_proxy:
                     proxy_needed_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.PROXY
-                else:
-                    # 叶子节点
-                    pass
-                if aggregated_as and aggregated_as.value > 0:
+                # 1.3 报告聚合结果
+                if aggregated_as != NodeStatus.BRANCH:
                     logging.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
-            else:
-                cur_path = ".".join(path)
-                match node.status:
-                    case NodeStatus.DIRECT:
-                        direct_ok_suffixes.append(cur_path)
-                    case NodeStatus.PROXY:
-                        proxy_needed_suffixes.append(cur_path)
-                for txt, each in node.children.items():
-                    path.appendleft(txt)
-                    dfs(each, path)
-                    path.popleft()
+                    return
+            # 2. 好吧，不能聚合
+            # 2.1 节点自己是否对应某条规则？
+            match node.status:
+                case NodeStatus.DIRECT:
+                    direct_ok_suffixes.append(cur_path)
+                case NodeStatus.PROXY:
+                    proxy_needed_suffixes.append(cur_path)
+            # 2.2 递归子节点
+            for txt, each in node.children.items():
+                path.appendleft(txt)
+                dfs(each, path)
+                path.popleft()
 
-        for txt, child in self.root.children.items():
-            dfs(child, deque([txt]))
+        # for txt, child in self.root.children.items():
+        #     dfs(child, deque([txt]))
+        dfs(self.root, deque())
         return direct_ok_suffixes, proxy_needed_suffixes
 
 
