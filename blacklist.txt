@@ -1,3 +1,17 @@
+sync.services.mozilla.com
+detectportal.firefox.com
+googleusercontent.com
+telemetry.mozilla.org
 accounts.firefox.com
+fastly-edge.com
+darkreader.org
+chatgpt.com
+discord.com
+apikey.fun
+claude.com
+discord.gg
 google.com
 asmr.one
+claude.ai
+openai.com
+anthropic.com
