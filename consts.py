@@ -14,7 +14,7 @@ CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 
 MAX_TIMEOUT: float = 5.0  # 代理超时时间
-MAX_RETRY: int = 4  # 最大重试次数
+MAX_RETRY: int = 3  # 最大重试次数
 
 # 一些泛型常量
 P = ParamSpec("P")
@@ -23,8 +23,8 @@ R = TypeVar("R")
 
 def async_retry(
     acceptable_exceptions: Tuple[Type[BaseException], ...],
-    init_delay: float = 1.0,
-    factor: int = 2,
+    init_delay: float = 1.5,
+    factor: float = 2,
     max_retry: int = MAX_RETRY,
 ) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
     """

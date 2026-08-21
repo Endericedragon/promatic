@@ -13,9 +13,9 @@ def get_logger():
             log_colors={
                 "DEBUG": "cyan",
                 "INFO": "green",
-                "WARNING": "fg_202",
-                "ERROR": "bg_1",
-                "CRITICAL": "bold_red",
+                "WARNING": "fg_214",
+                "ERROR": "bg_214",
+                "CRITICAL": "bg_1",
             },
         )
     )

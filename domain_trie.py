@@ -12,7 +12,13 @@ class NodeStatus(Enum):
     PROXY = 2
 
     def __repr__(self):
-        return self.name
+        match self.value:
+            case 0:
+                return "❔"
+            case 1:
+                return "✅"
+            case 2:
+                return "🚀"
 
 
 class TrieNode:
@@ -198,10 +204,10 @@ def load_memo(trie: DomainTrie):
 def write_memo(trie: DomainTrie):
     whitelist, blacklist = trie.compress_and_collect()
     with open("whitelist.txt", "w", encoding="utf-8") as f:
-        for each in sorted(whitelist, key=lambda x: (-len(x), x)):
+        for each in sorted(whitelist, key=lambda x: (x, -len(x))):
             print(each, file=f)
     with open("blacklist.txt", "w", encoding="utf-8") as f:
-        for each in sorted(blacklist, key=lambda x: (-len(x), x)):
+        for each in sorted(blacklist, key=lambda x: (x, -len(x))):
             print(each, file=f)
 
 
