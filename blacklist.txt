@@ -1,1 +1,2 @@
-google.com
+clients6.google.com
+wjx.cn

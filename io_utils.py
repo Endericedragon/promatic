@@ -1,7 +1,8 @@
 import asyncio as aio
+from typing import Tuple
 
+from consts import MAX_TIMEOUT, async_retry
 from log_utils import get_logger
-from consts import MAX_TIMEOUT
 
 LOGGER = get_logger()
 
@@ -17,6 +18,54 @@ async def safe_close(writer: aio.StreamWriter):
         await writer.wait_closed()
     except:
         pass
+
+
+async def read_headers(reader: aio.StreamReader) -> bytearray:
+    """读取请求头。
+
+    该函数将从缓冲区中取走截至空行的内容，然后返回空行及之前的内容（即请求头）。
+    空行后的请求体仍然保留在缓冲区中。
+
+    请求头的格式一般如下，
+    ```
+    GET http://domain:port/path HTTP/1.1\r\n
+    Host: domain:port\r\n
+    ...\r\n  (每行均以\r\n结尾)
+    \r\n  (空行，请求头至此结束)
+    Payload  (请求体)
+    ```
+    """
+    data = bytearray()
+    while line := await reader.readline():  # 不停读取新行，直至EOF
+        data.extend(line)
+        if line in {b"\r\n", b"\n"}:  # 空行
+            break
+    return data
+
+
+@async_retry((aio.TimeoutError, OSError))
+async def try_open_connection(
+    host: str, port: int
+) -> Tuple[aio.StreamReader, aio.StreamWriter]:
+    """尝试打开连接。
+
+    使用async_retry包装后，采用指数退避的重试策略。
+    """
+    return await aio.wait_for(aio.open_connection(host, port), timeout=MAX_TIMEOUT)
+
+
+ACCEPTABLE_EXCS = (
+    ConnectionResetError,
+    BrokenPipeError,
+    OSError,
+    TimeoutError,
+    aio.TimeoutError,
+)
+
+
+@async_retry(ACCEPTABLE_EXCS)
+async def try_read(reader: aio.StreamReader):
+    return await aio.wait_for(reader.read(8192), timeout=MAX_TIMEOUT)
 
 
 async def pipe(
@@ -38,29 +87,18 @@ async def pipe(
 
     while True:
         try:  # 单独处理读异常
-            data = await aio.wait_for(p_in.read(8192), MAX_TIMEOUT)
+            # data = await aio.wait_for(p_in.read(8192), MAX_TIMEOUT)
+            data = await try_read(p_in)
             if not data:
                 break
-        except (
-            ConnectionResetError,
-            BrokenPipeError,
-            OSError,
-            TimeoutError,
-            aio.TimeoutError,
-        ) as e:
+        except ACCEPTABLE_EXCS as e:
             if is_in_remote:
                 raise FakeDirectError(f"Read failed with {type(e).__name__}")
             break
         try:  # 单独处理写异常
             p_out.write(data)
             await p_out.drain()
-        except (
-            ConnectionResetError,
-            BrokenPipeError,
-            OSError,
-            TimeoutError,
-            aio.TimeoutError,
-        ) as e:
+        except ACCEPTABLE_EXCS as e:
             if is_out_remote:
                 raise FakeDirectError(f"Write failed with {type(e).__name__}")
             break
@@ -95,26 +133,3 @@ async def bidirectional_pipe(
         exec = task.exception()
         if isinstance(exec, FakeDirectError):
             raise exec
-
-
-async def read_headers(reader: aio.StreamReader) -> bytearray:
-    """读取请求头。
-
-    该函数将从缓冲区中取走截至空行的内容，然后返回空行及之前的内容（即请求头）。
-    空行后的请求体仍然保留在缓冲区中。
-
-    请求头的格式一般如下，
-    ```
-    GET http://domain:port/path HTTP/1.1\r\n
-    Host: domain:port\r\n
-    ...\r\n  (每行均以\r\n结尾)
-    \r\n  (空行，请求头至此结束)
-    Payload  (请求体)
-    ```
-    """
-    data = bytearray()
-    while line := await reader.readline():  # 不停读取新行，直至EOF
-        data.extend(line)
-        if line in {b"\r\n", b"\n"}:  # 空行
-            break
-    return data

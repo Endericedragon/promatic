@@ -1,13 +1,7 @@
-githubusercontent.com
-topoint-outdoor.com
-chat.bilibili.com
+addons.mozilla.org
+open.weixin.qq.com
+work.weixin.qq.com
 live.bilibili.com
-fastly-edge.com
-vc.bilibili.com
-ly200-cdn.com
-firefox.com
+biligame.com
 mozilla.com
-720yun.com
-sanlida.cn
-ly200.com
 rbtab.com

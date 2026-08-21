@@ -5,12 +5,16 @@ from urllib.parse import urlparse
 
 from domain_trie import DomainTrie, NodeStatus, load_memo, write_memo
 from log_utils import get_logger
-from rw_utils import bidirectional_pipe, read_headers, safe_close
+from io_utils import bidirectional_pipe, read_headers, safe_close, try_open_connection
 
-from consts import MAX_RETRY, PORT, BACKEND_PROXY_PORT, MAX_TIMEOUT, EXP_TIMEOUT
+from consts import (
+    PORT,
+    BACKEND_PROXY_PORT,
+    MAX_TIMEOUT,
+    CONN_ESABLISHED,
+    CONN_PROXY_TEMPLATE,
+)
 
-CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
-CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 TRIE: DomainTrie = DomainTrie()
 LOGGER = get_logger()
 
@@ -32,10 +36,11 @@ async def handle_http(
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
-            target_reader, target_writer = await aio.wait_for(
-                aio.open_connection(host, port),
-                timeout=MAX_TIMEOUT,
-            )
+            # target_reader, target_writer = await aio.wait_for(
+            #     aio.open_connection(host, port),
+            #     timeout=MAX_TIMEOUT,
+            # )
+            target_reader, target_writer = await try_open_connection(host, port)
             # 将域名记录为直连
             LOGGER.info("[DH] {}:{}".format(host, port))
             TRIE.insert(host, NodeStatus.DIRECT)
@@ -85,10 +90,11 @@ async def handle_https(
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
-            target_reader, target_writer = await aio.wait_for(
-                aio.open_connection(host, port),
-                timeout=MAX_TIMEOUT,
-            )
+            # target_reader, target_writer = await aio.wait_for(
+            #     aio.open_connection(host, port),
+            #     timeout=MAX_TIMEOUT,
+            # )
+            target_reader, target_writer = await try_open_connection(host, port)
             # 将域名记录为直连
             LOGGER.info("[DHS] {}:{}".format(host, port))
             TRIE.insert(host, NodeStatus.DIRECT)
@@ -168,7 +174,6 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
 
 
 async def main():
-    load_memo(TRIE)
     stop_event = aio.Event()
     loop = aio.get_running_loop()
 
@@ -195,6 +200,7 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        load_memo(TRIE)
         aio.run(main())
     except KeyboardInterrupt as e:
         pass

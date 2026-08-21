@@ -78,6 +78,7 @@ class DomainTrie:
                 return NodeStatus.DIRECT
             elif node.has_proxy_child:
                 return NodeStatus.PROXY
+        # 3. 实在没辙
         return last_matched_status
 
     def view_tree(self):
@@ -123,6 +124,9 @@ class DomainTrie:
                 elif node.has_proxy_child:
                     proxy_needed_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.PROXY
+                else:
+                    # 叶子节点
+                    pass
                 if aggregated_as and aggregated_as.value > 0:
                     logging.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
             else:
