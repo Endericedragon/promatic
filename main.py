@@ -56,8 +56,21 @@ async def handle_http(
         # 3.1 把后端传过来的头部直接丢给目标
         target_writer.write(header_bytes)
         await target_writer.drain()
+
         # 3.2 然后让用户和目标直接双向通信
-        await bidirectional_pipe(reader, writer, target_reader, target_writer)
+        def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
+            global LOGGER, TRIE
+            nonlocal use_proxy
+            if use_proxy:
+                # 将域名记录为代理
+                LOGGER.info("[PH] {}:{}".format(host, port))
+                TRIE.insert(host, NodeStatus.PROXY)
+            else:
+                # 将域名记录为直连
+                LOGGER.info("[DH] {}:{}".format(host, port))
+                TRIE.insert(host, NodeStatus.DIRECT)
+
+        await bidirectional_pipe(reader, writer, target_reader, target_writer, mark_as)
         # 3.3 通信成功
         if use_proxy:
             # 将域名记录为代理
@@ -118,15 +131,20 @@ async def handle_https(
         # 3.1 回头告诉用户，代理连接已建立
         writer.write(CONN_ESABLISHED.encode("latin1"))
         await writer.drain()
+
         # 3.2 然后让用户和目标直接双向通信
-        await bidirectional_pipe(reader, writer, target_reader, target_writer)
+        def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
+            global LOGGER, TRIE
+            nonlocal use_proxy
+            if use_proxy:
+                LOGGER.info("[PHS] {}:{}".format(host, port))
+                TRIE.insert(host, NodeStatus.PROXY)
+            else:
+                LOGGER.info("[DHS] {}:{}".format(host, port))
+                TRIE.insert(host, NodeStatus.DIRECT)
+
+        await bidirectional_pipe(reader, writer, target_reader, target_writer, mark_as)
         # 3.3 通信成功
-        if use_proxy:
-            LOGGER.info("[PHS] {}:{}".format(host, port))
-            TRIE.insert(host, NodeStatus.PROXY)
-        else:
-            LOGGER.info("[DHS] {}:{}".format(host, port))
-            TRIE.insert(host, NodeStatus.DIRECT)
     except Exception as e:  # 只会被FakeDirectError触发
         LOGGER.warning(f"[{'P' if use_proxy else 'D'}HSErr] {e} {host}:{port}")
         if not use_proxy:

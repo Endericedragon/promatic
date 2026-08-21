@@ -1,5 +1,5 @@
 import asyncio as aio
-from typing import Tuple
+from typing import Callable, Tuple
 
 from consts import MAX_TIMEOUT, async_retry
 from log_utils import get_logger
@@ -69,9 +69,10 @@ async def pipe(
     helper_msg: str,
     is_in_remote: bool,
     is_out_remote: bool,
-):
-    """将p_in中的数据写入p_out，返回从p_in接收到的字节数。
-    
+    on_recv_first_data: Callable[[], None] | None = None,
+) -> int:
+    """将p_in中的数据写入p_out，返回从p_in读取到的字节数。
+
     当p_in读到EOF时，尝试向p_out发送EOF
 
     Args:
@@ -80,6 +81,9 @@ async def pipe(
         helper_msg: 日志中显示的消息
         is_in_remote: 输入流是否为远端
         is_out_remote: 输出流是否为远端
+        on_recv_first_data: 当收到首包时调用的回调函数
+    Returns:
+        已接收的字节数
     """
     recv_byte: int = 0  # 已接收的字节数
     while True:
@@ -92,6 +96,8 @@ async def pipe(
                 data = await p_in.read(8192)
             if not data:
                 break
+            if on_recv_first_data and recv_byte == 0:
+                on_recv_first_data()
             recv_byte += len(data)
         except ACCEPTABLE_EXCS as e:
             if is_in_remote and recv_byte == 0:
@@ -117,14 +123,34 @@ async def pipe(
 
 
 async def bidirectional_pipe(
-    cr: aio.StreamReader,
-    cw: aio.StreamWriter,
-    sr: aio.StreamReader,
-    sw: aio.StreamWriter,
+    client_reader: aio.StreamReader,
+    client_writer: aio.StreamWriter,
+    server_reader: aio.StreamReader,
+    server_writer: aio.StreamWriter,
+    on_recv_first_remote_data: Callable[[], None] | None = None,
 ):
-    """双向管道。将cr中的数据写入cw，将sr中的数据写入sw"""
-    task1 = aio.create_task(pipe(cr, sw, "CR -> SW", False, True))
-    task2 = aio.create_task(pipe(sr, cw, "SR -> CW", True, False))
+    """双向管道。将client_reader中的数据写入server_writer，将server_reader中的数据写入server_writer
+    
+    Args:
+        client_reader: 客户端读取流
+        client_writer: 客户端写入流
+        server_reader: 远端读取流
+        server_writer: 远端写入流
+        on_recv_first_remote_data: 当收到首个远端包时调用的回调函数
+    Returns:
+        无
+    """
+    task1 = aio.create_task(pipe(client_reader, server_writer, "CR -> SW", False, True))
+    task2 = aio.create_task(
+        pipe(
+            server_reader,
+            client_writer,
+            "SR -> CW",
+            True,
+            False,
+            on_recv_first_remote_data,
+        )
+    )
     # ? 等待任意任务完成
     done, pending = await aio.wait([task1, task2], return_when=aio.FIRST_COMPLETED)
     # ? 然后取消剩余的任务
@@ -132,15 +158,15 @@ async def bidirectional_pipe(
         task.cancel()
     await aio.gather(*pending, return_exceptions=True)
     # 最后关闭远端writer
-    await safe_close(sw)
+    await safe_close(server_writer)
 
     # 只在已完成的任务里检查，取消的任务不会被检查
     for task in done:
         exec = task.exception()
         if isinstance(exec, FakeDirectError):
             raise exec
-    # 浏览器超时
-    client_bytes = task1.result() if not task1.exception() else 0
-    remote_bytes = task2.result() if not task2.exception() else 0
-    if client_bytes > 0 and remote_bytes == 0:
+    # 处理：客户端发送了数据，但远端未回复，客户端主动关闭连接
+    client_sent_bytes = task1.result() if not task1.exception() else 0
+    remote_recvd_bytes = task2.result() if not task2.exception() else 0
+    if client_sent_bytes > 0 and remote_recvd_bytes == 0:
         raise FakeDirectError("Remote sent nothing")
