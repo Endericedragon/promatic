@@ -1,7 +1,7 @@
 import asyncio as aio
 from typing import Callable, Tuple
 
-from consts import MAX_TIMEOUT, async_retry
+from consts import MAX_DIRECT_TIMEOUT, MAX_PROXY_TIMEOUT
 from log_utils import get_logger
 
 LOGGER = get_logger()
@@ -43,15 +43,16 @@ async def read_headers(reader: aio.StreamReader) -> bytearray:
     return data
 
 
-@async_retry((aio.TimeoutError, OSError))
-async def try_open_connection(
+async def try_open_direct_connection(
     host: str, port: int
 ) -> Tuple[aio.StreamReader, aio.StreamWriter]:
     """尝试打开连接。
 
     使用async_retry包装后，采用指数退避的重试策略。
     """
-    return await aio.wait_for(aio.open_connection(host, port), timeout=MAX_TIMEOUT)
+    return await aio.wait_for(
+        aio.open_connection(host, port), timeout=MAX_DIRECT_TIMEOUT
+    )
 
 
 ACCEPTABLE_EXCS = (
@@ -69,6 +70,7 @@ async def pipe(
     helper_msg: str,
     is_in_remote: bool,
     is_out_remote: bool,
+    read_through_proxy: bool = False,
     on_recv_first_data: Callable[[], None] | None = None,
 ) -> int:
     """将p_in中的数据写入p_out，返回从p_in读取到的字节数。
@@ -81,6 +83,7 @@ async def pipe(
         helper_msg: 日志中显示的消息
         is_in_remote: 输入流是否为远端
         is_out_remote: 输出流是否为远端
+        read_through_proxy: 是否通过代理读取数据
         on_recv_first_data: 当收到首包时调用的回调函数
     Returns:
         已接收的字节数
@@ -90,7 +93,12 @@ async def pipe(
         try:  # 单独处理读异常
             if is_in_remote and recv_byte == 0:
                 # 首包通信，设置超时
-                data = await aio.wait_for(p_in.read(8192), timeout=MAX_TIMEOUT)
+                data = await aio.wait_for(
+                    p_in.read(8192),
+                    timeout=(
+                        MAX_PROXY_TIMEOUT if read_through_proxy else MAX_DIRECT_TIMEOUT
+                    ),
+                )
             else:
                 # 说明首包通信已成功，不再设置超时
                 data = await p_in.read(8192)
@@ -127,10 +135,11 @@ async def bidirectional_pipe(
     client_writer: aio.StreamWriter,
     server_reader: aio.StreamReader,
     server_writer: aio.StreamWriter,
+    read_server_through_proxy: bool = False,
     on_recv_first_remote_data: Callable[[], None] | None = None,
 ):
     """双向管道。将client_reader中的数据写入server_writer，将server_reader中的数据写入server_writer
-    
+
     Args:
         client_reader: 客户端读取流
         client_writer: 客户端写入流
@@ -140,14 +149,24 @@ async def bidirectional_pipe(
     Returns:
         无
     """
-    task1 = aio.create_task(pipe(client_reader, server_writer, "CR -> SW", False, True))
+    task1 = aio.create_task(
+        pipe(
+            client_reader,
+            server_writer,
+            "ClientReader -> ServerWriter",
+            False,
+            True,
+            False,
+        )
+    )
     task2 = aio.create_task(
         pipe(
             server_reader,
             client_writer,
-            "SR -> CW",
+            "ServerReader -> ClientWriter",
             True,
             False,
+            read_server_through_proxy,
             on_recv_first_remote_data,
         )
     )

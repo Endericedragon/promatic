@@ -12,15 +12,19 @@ claude.com
 cloudflare.com
 cloudflarestorage.com
 com.hk
+d3oia8etllorh5.cloudfront.net
 danbooru.donmai.us
 darkreader.org
 detectportal.firefox.com
 discord.com
 discord.gg
 encrypted-tbn0.gstatic.com
+encrypted-tbn1.gstatic.com
 encrypted-tbn2.gstatic.com
+encrypted-tbn3.gstatic.com
 fastly-edge.com
 ggpht.com
+github.com
 google.com
 googleusercontent.com
 googlevideo.com
@@ -28,6 +32,7 @@ greasyfork.org
 hanime1.me
 hgamegallery.com
 iwara.tv
+jnn-pa.googleapis.com
 morencius.com
 nhentai.net
 open.spotify.com
@@ -41,5 +46,6 @@ twimg.com
 uns.wtf
 x.com
 xicons.org
+yankong.org
 youtube.com
 ytimg.com

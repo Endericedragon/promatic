@@ -5,12 +5,17 @@ from urllib.parse import urlparse
 
 from domain_trie import DomainTrie, NodeStatus, load_memo, write_memo
 from log_utils import get_logger
-from io_utils import bidirectional_pipe, read_headers, safe_close, try_open_connection
+from io_utils import (
+    bidirectional_pipe,
+    read_headers,
+    safe_close,
+    try_open_direct_connection,
+)
 
 from consts import (
     PORT,
     BACKEND_PROXY_PORT,
-    MAX_TIMEOUT,
+    MAX_PROXY_TIMEOUT,
     CONN_ESABLISHED,
     CONN_PROXY_TEMPLATE,
 )
@@ -36,7 +41,8 @@ async def handle_http(
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
-            target_reader, target_writer = await try_open_connection(host, port)
+            target_reader, target_writer = await try_open_direct_connection(host, port)
+            # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
             LOGGER.warning(f"[✅HErr] {type(e).__name__} {host}:{port}")
@@ -47,10 +53,10 @@ async def handle_http(
         try:
             target_reader, target_writer = await aio.wait_for(
                 aio.open_connection("127.0.0.1", BACKEND_PROXY_PORT),
-                timeout=MAX_TIMEOUT,
+                timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
-            LOGGER.warning(f"[🚀HErr] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[🚀HErr] {type(e).__name__} {host}:{port}")
             return
     # 3. 开始通信
     try:
@@ -69,7 +75,14 @@ async def handle_http(
                 # 首包通信成功，才能放心将其标记为直连
                 TRIE.insert(host, NodeStatus.DIRECT)
 
-        await bidirectional_pipe(reader, writer, target_reader, target_writer, mark_as)
+        await bidirectional_pipe(
+            reader,
+            writer,
+            target_reader,
+            target_writer,
+            read_server_through_proxy=True,
+            on_recv_first_remote_data=mark_as,
+        )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
         LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr] {e} {host}:{port}")
@@ -93,8 +106,8 @@ async def handle_https(
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
-            target_reader, target_writer = await try_open_connection(host, port)
-            # 先不急着将域名记录为直连
+            target_reader, target_writer = await try_open_direct_connection(host, port)
+            # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 记录日志并切换为代理
             LOGGER.warning(f"[✅HSErr] {type(e).__name__} {host}:{port}")
@@ -104,8 +117,9 @@ async def handle_https(
     # 2. 若直连失败或命中代理规则
     if use_proxy:
         try:
-            target_reader, target_writer = await aio.open_connection(
-                "127.0.0.1", BACKEND_PROXY_PORT
+            target_reader, target_writer = await aio.wait_for(
+                aio.open_connection("127.0.0.1", BACKEND_PROXY_PORT),
+                timeout=MAX_PROXY_TIMEOUT,
             )
             # 2.1 构造代理请求
             PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
@@ -116,7 +130,7 @@ async def handle_https(
             if not result or b"200" not in result:
                 raise Exception()  # 2.2.1 强制跳转到except
         except Exception as e:
-            LOGGER.warning(f"[🚀HSErr] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[🚀HSErr] {type(e).__name__} {host}:{port}")
             return
     # 3. 开始通信
     try:
@@ -136,7 +150,14 @@ async def handle_https(
                 # 首包通信成功，才能放心将其标记为直连
                 TRIE.insert(host, NodeStatus.DIRECT)
 
-        await bidirectional_pipe(reader, writer, target_reader, target_writer, mark_as)
+        await bidirectional_pipe(
+            reader,
+            writer,
+            target_reader,
+            target_writer,
+            read_server_through_proxy=True,
+            on_recv_first_remote_data=mark_as,
+        )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
         LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HSErr] {e} {host}:{port}")
