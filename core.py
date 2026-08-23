@@ -3,7 +3,7 @@ import signal
 from sys import platform as current_platform
 from urllib.parse import urlparse
 
-from domain_trie import DomainTrie, NodeStatus, load_memo, write_memo
+from domain_trie import NodeStatus, load_memo, write_memo
 from log_utils import get_logger
 from io_utils import (
     bidirectional_pipe,
@@ -18,9 +18,9 @@ from consts import (
     MAX_PROXY_TIMEOUT,
     CONN_ESABLISHED,
     CONN_PROXY_TEMPLATE,
+    TRIE,
 )
 
-TRIE: DomainTrie = DomainTrie()
 LOGGER = get_logger()
 
 

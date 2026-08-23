@@ -1,16 +1,14 @@
 import asyncio as aio
 import tkinter.ttk as ttk
 from tkinter import Tk
-import _thread
 from threading import Thread
 
-from consts import get_port, get_backend_port, set_port, set_backend_port
+from consts import get_port, get_backend_port, set_port, set_backend_port, TRIE
 from core import main_task
-from domain_trie import DomainTrie, load_memo, write_memo
+from domain_trie import load_memo, write_memo
 from log_utils import get_logger
 
 LOGGER = get_logger()
-TRIE: DomainTrie = DomainTrie()
 
 
 class GUI:
@@ -73,6 +71,7 @@ class GUI:
         self.stop_signal = None
 
     def handle_click(self):
+        global TRIE
         if self.stopped:
             # 未启动，准备启动
             try:

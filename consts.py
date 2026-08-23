@@ -1,5 +1,7 @@
 # HTTPS时使用。HTTPS中，只有当服务器返回200 Connection Established时，
 # 客户端才认为连接成功，通信才能继续。
+from domain_trie import DomainTrie
+
 CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 # HTTPS时使用。用于构建CONNECT请求，
 # 发往目标服务器（远端或本地代理服务器）请求构建连接。
@@ -13,6 +15,7 @@ MAX_RETRY: int = 3  # 最大重试次数
 """代理设置"""
 PORT: int = 33333
 BACKEND_PROXY_PORT: int = 32001
+TRIE: DomainTrie = DomainTrie()
 
 
 def get_port() -> int:
