@@ -75,7 +75,7 @@ async def pipe(
 ) -> int:
     """将p_in中的数据写入p_out，返回从p_in读取到的字节数。
 
-    当p_in读到EOF时，尝试向p_out发送EOF
+    当p_in读到EOF时，尝试向p_out发送EOF（FIN标志位）从而半关闭连接。
 
     Args:
         p_in: 输入流
@@ -172,7 +172,9 @@ async def bidirectional_pipe(
     )
     # ? 等待任意任务完成
     done, pending = await aio.wait([task1, task2], return_when=aio.FIRST_COMPLETED)
-    # ? 然后取消剩余的任务
+    # ? 为啥可以放心取消剩余的任务？因为任务完成，等价于reader读到EOF。
+    # 1. ServerReader读到EOF，这时服务端不再发送数据，客户端Reader的相应任务也当然要取消掉
+    # 2. ClientReader读到EOF，大概率是浏览器被关闭等情况，这时候不应让远端继续再等，也应取消
     for task in pending:
         task.cancel()
     await aio.gather(*pending, return_exceptions=True)

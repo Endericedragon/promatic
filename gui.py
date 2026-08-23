@@ -21,18 +21,19 @@ class GUI:
         # GUI准备
         self.root = Tk()
         self.root.title("Promatic")
+        self.root.columnconfigure(1, weight=1)
         # Row 1
         self.label_backend_port = ttk.Label(self.root, text="后端端口：")
-        self.input_backend_port = ttk.Entry(self.root, width=16)
+        self.input_backend_port = ttk.Entry(self.root)
         self.input_backend_port.insert(0, str(get_backend_port()))
         self.label_backend_port.grid(column=0, row=0)
-        self.input_backend_port.grid(column=1, row=0)
+        self.input_backend_port.grid(column=1, row=0, sticky="we")
         # Row 2
         self.label_port = ttk.Label(self.root, text="代理端口：")
         self.label_port.grid(column=0, row=1)
-        self.input_port = ttk.Entry(self.root, width=16)
+        self.input_port = ttk.Entry(self.root)
         self.input_port.insert(0, str(get_port()))
-        self.input_port.grid(column=1, row=1)
+        self.input_port.grid(column=1, row=1, sticky="we")
         # Row 3
         self.start_button = ttk.Button(
             self.root, text="启动代理", command=self.handle_click
@@ -60,15 +61,15 @@ class GUI:
         """异步循环停止时调用。副作用包括：
         - 重置按钮文本
         - 重置`self.loop`和`self.stop_signal`
-        - 将收集到的规则持久化写入磁盘
         - 设置 `self.stopped` 为True
         """
-        LOGGER.info("Proxy server stopped.")
         self.stopped = True
-        write_memo(TRIE)
+        LOGGER.info("Proxy server stopped.")
         self.start_button.config(text="启动代理")
         self.loop = None
         self.stop_signal = None
+        self.input_port.config(state="normal")
+        self.input_backend_port.config(state="normal")
 
     def handle_click(self):
         global TRIE
@@ -86,6 +87,8 @@ class GUI:
             load_memo(TRIE)
             self.stopped = False
             self.start_button.config(text="停止代理")
+            self.input_port.config(state="disabled")
+            self.input_backend_port.config(state="disabled")
             self.proxy_thread = Thread(target=self.__run_async_loop, daemon=True)
             self.proxy_thread.start()
         else:
@@ -93,8 +96,12 @@ class GUI:
             if self.loop and self.loop.is_running() and self.stop_signal:
                 self.loop.call_soon_threadsafe(self.stop_signal.set)
             self.start_button.config(text="停止中……")
+            write_memo(TRIE)
 
     def mainloop(self):
+        self.root.update_idletasks()
+        current_height = self.root.winfo_reqheight()
+        self.root.geometry(f"225x{current_height}")
         self.root.mainloop()
 
 

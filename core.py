@@ -226,6 +226,7 @@ async def main_task(stop_event: aio.Event):
     LOGGER.info("Proxy server started on 127.0.0.1:{}".format(get_port()))
     async with proxy_server:
         await stop_event.wait()
+        write_memo(TRIE)  # 持久化
         LOGGER.info("Stopping proxy server...")
         proxy_server.close()
         await proxy_server.wait_closed()
@@ -242,4 +243,3 @@ if __name__ == "__main__":
         LOGGER.error("Unknown error:", type(e).__name__)
     finally:
         LOGGER.info("Shutting down proxy server...")
-        write_memo(TRIE)
