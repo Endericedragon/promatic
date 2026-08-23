@@ -13,8 +13,8 @@ from io_utils import (
 )
 
 from consts import (
-    PORT,
-    BACKEND_PROXY_PORT,
+    get_port,
+    get_backend_port,
     MAX_PROXY_TIMEOUT,
     CONN_ESABLISHED,
     CONN_PROXY_TEMPLATE,
@@ -52,7 +52,7 @@ async def handle_http(
     if use_proxy:
         try:
             target_reader, target_writer = await aio.wait_for(
-                aio.open_connection("127.0.0.1", BACKEND_PROXY_PORT),
+                aio.open_connection("127.0.0.1", get_backend_port()),
                 timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
@@ -118,7 +118,7 @@ async def handle_https(
     if use_proxy:
         try:
             target_reader, target_writer = await aio.wait_for(
-                aio.open_connection("127.0.0.1", BACKEND_PROXY_PORT),
+                aio.open_connection("127.0.0.1", get_backend_port()),
                 timeout=MAX_PROXY_TIMEOUT,
             )
             # 2.1 构造代理请求
@@ -202,13 +202,13 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
         await safe_close(writer)
 
 
-async def main():
-    stop_event = aio.Event()
+async def set_signals_and_run(stop_event: aio.Event):
+    """设置信号处理函数并运行异步循环。"""
     loop = aio.get_running_loop()
 
     def __handle_signal():
         nonlocal stop_event
-        LOGGER.info("Signal received, shutting down proxy server...")
+        LOGGER.info("Signal received!")
         stop_event.set()
 
     if current_platform == "win32":
@@ -218,8 +218,12 @@ async def main():
         loop.add_signal_handler(signal.SIGINT, __handle_signal)
         loop.add_signal_handler(signal.SIGTERM, __handle_signal)
 
-    proxy_server = await aio.start_server(start_proxy_server, "127.0.0.1", PORT)
-    LOGGER.info("Proxy server started on 127.0.0.1:{}".format(PORT))
+    await main_task(stop_event)
+
+
+async def main_task(stop_event: aio.Event):
+    proxy_server = await aio.start_server(start_proxy_server, "127.0.0.1", get_port())
+    LOGGER.info("Proxy server started on 127.0.0.1:{}".format(get_port()))
     async with proxy_server:
         await stop_event.wait()
         LOGGER.info("Stopping proxy server...")
@@ -228,9 +232,10 @@ async def main():
 
 
 if __name__ == "__main__":
+    stop_event = aio.Event()
+    load_memo(TRIE)
     try:
-        load_memo(TRIE)
-        aio.run(main())
+        aio.run(set_signals_and_run(stop_event))
     except KeyboardInterrupt as e:
         pass
     except Exception as e:
