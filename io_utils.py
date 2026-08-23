@@ -1,5 +1,5 @@
 import asyncio as aio
-from typing import Callable, Tuple
+from typing import Callable, Dict
 
 from consts import MAX_DIRECT_TIMEOUT, MAX_PROXY_TIMEOUT
 from log_utils import get_logger
@@ -18,6 +18,18 @@ async def safe_close(writer: aio.StreamWriter):
         await writer.wait_closed()
     except:
         pass
+
+
+def ignore_windows_socket_reset(
+    loop: aio.AbstractEventLoop, context: Dict[str, BaseException]
+):
+    """过滤 Windows 下 ProactorEventLoop 常见的底层连接重置噪音"""
+    if (exc := context.get("exception")) and (
+        isinstance(exc, ConnectionResetError)
+        or (isinstance(exc, OSError) and getattr(exc, "winerror", None) == 10054)
+    ):
+        return
+    loop.default_exception_handler(context)
 
 
 async def read_headers(reader: aio.StreamReader) -> bytearray:
@@ -41,18 +53,6 @@ async def read_headers(reader: aio.StreamReader) -> bytearray:
         if line in {b"\r\n", b"\n"}:  # 空行
             break
     return data
-
-
-async def try_open_direct_connection(
-    host: str, port: int
-) -> Tuple[aio.StreamReader, aio.StreamWriter]:
-    """尝试打开连接。
-
-    使用async_retry包装后，采用指数退避的重试策略。
-    """
-    return await aio.wait_for(
-        aio.open_connection(host, port), timeout=MAX_DIRECT_TIMEOUT
-    )
 
 
 ACCEPTABLE_EXCS = (
@@ -138,7 +138,8 @@ async def bidirectional_pipe(
     read_server_through_proxy: bool = False,
     on_recv_first_remote_data: Callable[[], None] | None = None,
 ):
-    """双向管道。将client_reader中的数据写入server_writer，将server_reader中的数据写入server_writer
+    """双向管道。将client_reader中的数据写入server_writer，将server_reader中的数据写入server_writer。
+    注意：该函数不会关闭server_writer，需要另行关闭。
 
     Args:
         client_reader: 客户端读取流
@@ -178,8 +179,6 @@ async def bidirectional_pipe(
     for task in pending:
         task.cancel()
     await aio.gather(*pending, return_exceptions=True)
-    # 最后关闭远端writer
-    await safe_close(server_writer)
 
     # 只在已完成的任务里检查，取消的任务不会被检查
     for task in done:

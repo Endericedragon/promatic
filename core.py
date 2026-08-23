@@ -3,23 +3,23 @@ import signal
 from sys import platform as current_platform
 from urllib.parse import urlparse
 
+from consts import (
+    CONN_ESABLISHED,
+    CONN_PROXY_TEMPLATE,
+    MAX_DIRECT_TIMEOUT,
+    MAX_PROXY_TIMEOUT,
+    TRIE,
+    get_backend_port,
+    get_port,
+)
 from domain_trie import NodeStatus, load_memo, write_memo
-from log_utils import get_logger
 from io_utils import (
     bidirectional_pipe,
     read_headers,
     safe_close,
-    try_open_direct_connection,
+    ignore_windows_socket_reset,
 )
-
-from consts import (
-    get_port,
-    get_backend_port,
-    MAX_PROXY_TIMEOUT,
-    CONN_ESABLISHED,
-    CONN_PROXY_TEMPLATE,
-    TRIE,
-)
+from log_utils import get_logger
 
 LOGGER = get_logger()
 
@@ -41,7 +41,9 @@ async def handle_http(
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
-            target_reader, target_writer = await try_open_direct_connection(host, port)
+            target_reader, target_writer = await aio.wait_for(
+                aio.open_connection(host, port), timeout=MAX_DIRECT_TIMEOUT
+            )
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
@@ -106,7 +108,9 @@ async def handle_https(
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
-            target_reader, target_writer = await try_open_direct_connection(host, port)
+            target_reader, target_writer = await aio.wait_for(
+                aio.open_connection(host, port), timeout=MAX_DIRECT_TIMEOUT
+            )
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 记录日志并切换为代理
@@ -131,6 +135,7 @@ async def handle_https(
                 raise Exception()  # 2.2.1 强制跳转到except
         except Exception as e:
             LOGGER.error(f"[🚀HSErr] {type(e).__name__} {host}:{port}")
+            await safe_close(target_writer)
             return
     # 3. 开始通信
     try:
@@ -164,6 +169,8 @@ async def handle_https(
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
+    finally:
+        await safe_close(target_writer)
 
 
 async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter):
@@ -205,6 +212,7 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
 async def set_signals_and_run(stop_event: aio.Event):
     """设置信号处理函数并运行异步循环。"""
     loop = aio.get_running_loop()
+    loop.set_exception_handler(ignore_windows_socket_reset)
 
     def __handle_signal():
         nonlocal stop_event

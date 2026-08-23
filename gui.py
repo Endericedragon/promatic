@@ -1,11 +1,12 @@
 import asyncio as aio
 import tkinter.ttk as ttk
-from tkinter import Tk
 from threading import Thread
+from tkinter import Tk
 
-from consts import get_port, get_backend_port, set_port, set_backend_port, TRIE
+from consts import TRIE, get_backend_port, get_port, set_backend_port, set_port
 from core import main_task
 from domain_trie import load_memo, write_memo
+from io_utils import ignore_windows_socket_reset
 from log_utils import get_logger
 
 LOGGER = get_logger()
@@ -48,6 +49,7 @@ class GUI:
         - 在运行结束后调用`self.__on_stopped`
         """
         self.loop = aio.new_event_loop()
+        self.loop.set_exception_handler(ignore_windows_socket_reset)
         aio.set_event_loop(self.loop)
         self.stop_signal = aio.Event()
         try:

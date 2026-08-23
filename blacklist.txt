@@ -108,6 +108,7 @@ posthog.com
 profile-cdn77.xvideos-cdn.com
 resources.blogblog.com
 s3for.me
+securetoken.googleapis.com
 sexlikereal.com
 shounen.xyz
 simpcity.cr
