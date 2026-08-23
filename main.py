@@ -85,7 +85,7 @@ async def handle_http(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr] {e} {host}:{port}")
+        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr2] {e} {host}:{port}")
         if not use_proxy:
             # 3.3 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
@@ -160,7 +160,7 @@ async def handle_https(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HSErr] {e} {host}:{port}")
+        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HSErr2] {e} {host}:{port}")
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
