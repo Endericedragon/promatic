@@ -166,7 +166,7 @@ class DomainTrie:
                     aggregated_as = NodeStatus.PROXY
                 # 1.3 报告聚合结果
                 if aggregated_as != NodeStatus.BRANCH:
-                    LOGGER.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
+                    LOGGER.debug("聚合为{}: {}".format(repr(aggregated_as), cur_path))
                     return
             # 2. 好吧，不能聚合
             # 2.1 节点自己是否对应某条规则？
@@ -195,7 +195,8 @@ def load_memo(trie: DomainTrie):
         nonlocal trie
         if pp.exists() and pp.is_file():
             for each in pp.read_text(encoding="utf-8").splitlines():
-                trie.insert(each, stat)
+                if each:  # 过滤空行
+                    trie.insert(each, stat)
         else:
             pp.touch()
 

@@ -15,16 +15,33 @@ LOGGER = get_logger()
 
 
 # ==== 任务栏相关 ====
-def default_tray_icon():
+def default_tray_icon() -> Image.Image:
+    """创建托盘上的图标。"""
+
     image = Image.new("RGBA", (64, 64))
     draw = ImageDraw.Draw(image)
-    draw.circle((32, 32), 24, fill="orange")
+    elli_radius: int = 24
+    draw.ellipse(
+        (32 - elli_radius, 32 - elli_radius, 32 + elli_radius, 32 + elli_radius),
+        fill=None,
+        outline="orange",
+        width=10,
+    )
+    rect_size: int = 24
+    draw.rectangle((64 - rect_size, 0, 64, rect_size), fill="white")
     return image
 
 
-def create_tray_utils(loop: aio.AbstractEventLoop, stop_event: aio.Event):
-    def on_exit(icon: PIcon, item: pystray.MenuItem):
-        print(type(icon), type(item))
+def create_tray_utils(loop: aio.AbstractEventLoop, stop_event: aio.Event) -> PIcon:
+    """设置托盘图标的右键菜单内容。
+    Args:
+        loop: 异步事件循环。用于发送停机信号。
+        stop_event: 停机信号。
+    Returns:
+        PIcon: 托盘图标对象。
+    """
+
+    def on_exit(icon: PIcon, _: pystray.MenuItem):
         LOGGER.info("Exit in tray")
         loop.call_soon_threadsafe(stop_event.set)
         icon.stop()
