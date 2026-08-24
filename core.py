@@ -94,8 +94,7 @@ async def handle_http(
             # 3.3.1 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
         else:
-            # 3.3.2 如果命中代理规则但无法成功的，记为分支节点
-            TRIE.insert(host, NodeStatus.BRANCH)
+            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
     finally:
         await safe_close(target_writer)
 
@@ -122,7 +121,7 @@ async def handle_https(
             )
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
-            # 记录日志并切换为代理
+            # 标记为需要代理，并切换到代理
             LOGGER.warning(f"[✅HSErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.PROXY)
             use_proxy = True
@@ -136,6 +135,7 @@ async def handle_https(
             )
         except Exception as e:
             LOGGER.error(f"[🚀HSErr0] {type(e).__name__} {host}:{port}")
+            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return
         try:
             # 2.1 构造代理请求
@@ -183,6 +183,8 @@ async def handle_https(
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
+        else:
+            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
     finally:
         await safe_close(target_writer)
 

@@ -69,9 +69,11 @@ async def set_signals_and_run(stop_event: aio.Event):
     tray_icon.run_detached()
 
     def __handle_signal():
+        nonlocal tray_icon
         nonlocal stop_event
         LOGGER.info("Signal received!")
         stop_event.set()
+        tray_icon.stop()
 
     if current_platform == "win32":
         signal.signal(signal.SIGINT, lambda *_: __handle_signal())

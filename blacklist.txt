@@ -1,3 +1,8 @@
+14cd71487c7f.w.hcaptcha.com
+167.92
+1d0675367282.w.hcaptcha.com
+56.166
+7f5f27e0c2fb.w.hcaptcha.com
 abyssplayer.com
 accounts.firefox.com
 admamax.com
@@ -7,6 +12,7 @@ alibow.cn
 amazonaws.com
 anthropic.com
 anxious-pull.pro
+api.hcaptcha.com
 apikey.fun
 arena.ai
 asmhentai.com
@@ -23,11 +29,14 @@ bkcdn.net
 blacklist.tampermonkey.net
 blogger.com
 bonloyalty.com
+boomio-cdn.com
 c.delivery.consentmanager.net
 cdn.jsdelivr.net
 cdn.jwplayer.com
+cdn.plyr.io
 cdn1-smallimg.phncdn.com
 cdn1d-static-shared.phncdn.com
+chat.bilibili.com
 chatgpt.com
 civitai.com
 civitai.red
@@ -35,6 +44,7 @@ claude.ai
 claude.com
 cloudflare.com
 cloudflarestorage.com
+cloudfunctions.net
 com.hk
 copilot.microsoft.com
 coveralls.io
@@ -64,11 +74,13 @@ ew.phncdn.com
 faphouse.com
 fastly-edge.com
 fastly.net
+fb609c038d1e.w.hcaptcha.com
 fhgte.com
 firebase.googleapis.com
 firebaseinstallations.googleapis.com
 flaru.com
 flirtify.com
+fonts.googleapis.com
 g2fame.com
 gammaentertainment.com
 gemini.gstatic.com
@@ -83,6 +95,7 @@ googlevideo.com
 gravatar.com
 greasyfork.org
 hanime1.me
+hembed.com
 hentaiasmr.moe
 hgamegallery.com
 hls-cdn77.xvideos-cdn.com
@@ -98,6 +111,8 @@ ic-vt-nss.xhcdn.com
 identitytoolkit.googleapis.com
 imgbox.com
 imgix.net
+imgur.com
+instagram.com
 iwara.tv
 ixxx.com
 jnn-pa.googleapis.com
@@ -110,6 +125,7 @@ morphify.net
 myip.com
 nhentai.net
 nikabow.com
+onetrust.com
 onlyfans.com
 open.spotify.com
 openai.com
@@ -117,12 +133,14 @@ ourdream.ai
 pages.dev
 pdude.link
 picassoia.com
+pinterest.com
 pix-cdn77.phncdn.com
 pixhost.cc
 pixibay.cc
 pornhub.com
 posthog.com
 private-user-images.githubusercontent.com
+pro.fontawesome.com
 profile-cdn77.xvideos-cdn.com
 pypi.org
 raw.githubusercontent.com
@@ -131,6 +149,7 @@ reddit.com
 redditmedia.com
 redditstatic.com
 resources.blogblog.com
+rule34video.com
 s3for.me
 securetoken.googleapis.com
 sexlikereal.com
@@ -157,9 +176,11 @@ tiktokcdn.com
 trendshift.io
 twimg.com
 twitch.tv
+twitter.com
 ublockorigin.github.io
 uns.wtf
 valid-bottom.com
+vc.bilibili.com
 views.scientific-python.org
 x.com
 xhamster.com
