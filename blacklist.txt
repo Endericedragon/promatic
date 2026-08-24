@@ -2,6 +2,7 @@ abyssplayer.com
 accounts.firefox.com
 admamax.com
 ajax.googleapis.com
+aks-prod-japaneast.access-point.cloudmessaging.edge.microsoft.com
 alibow.cn
 amazonaws.com
 anthropic.com
@@ -16,6 +17,7 @@ asmr.one
 asmrjp.org
 asmroger.com
 asmrpleasure.com
+avatars.githubusercontent.com
 bing.com
 bkcdn.net
 blacklist.tampermonkey.net
@@ -35,6 +37,7 @@ cloudflare.com
 cloudflarestorage.com
 com.hk
 copilot.microsoft.com
+coveralls.io
 d3oia8etllorh5.cloudfront.net
 danbooru.donmai.us
 darkreader.org
@@ -60,6 +63,7 @@ ev-h.phncdn.com
 ew.phncdn.com
 faphouse.com
 fastly-edge.com
+fastly.net
 fhgte.com
 firebase.googleapis.com
 firebaseinstallations.googleapis.com
@@ -120,6 +124,7 @@ pornhub.com
 posthog.com
 private-user-images.githubusercontent.com
 profile-cdn77.xvideos-cdn.com
+pypi.org
 raw.githubusercontent.com
 redd.it
 reddit.com
@@ -152,8 +157,10 @@ tiktokcdn.com
 trendshift.io
 twimg.com
 twitch.tv
+ublockorigin.github.io
 uns.wtf
 valid-bottom.com
+views.scientific-python.org
 x.com
 xhamster.com
 xicons.org

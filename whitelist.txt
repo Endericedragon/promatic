@@ -1,7 +1,11 @@
+127.net
+163.com
+163yun.com
 54kefu.net
 720static.com
 720yun.com
 abovedomains.com
+access-point.cloudmessaging.edge.microsoft.com
 accounts.spotify.com
 addons.mozilla.org
 ads.mozilla.org
@@ -77,6 +81,8 @@ dlsite.jp
 eisys-bcs.jp
 entitlements.jwplayer.com
 erovoice.us
+etrack05.com
+etrack07.com
 facebook.net
 fastly.jsdelivr.net
 fengkongcloud.cn
@@ -162,6 +168,7 @@ qq.com
 r2.dev
 rbtab.com
 react.gammacdn.com
+readthedocs.io
 realmofresearch.com
 recaptcha.net
 redditspace.com
@@ -181,10 +188,13 @@ soundgasm.net
 speeledabantespauses.qpon
 spotifycdn.com
 ssl.gstatic.com
+sstatic.net
+stackoverflow.com
 static-ah.xhcdn.com
 static01-cms-evilangel.gammacdn.com
 static01-cms-fame.gammacdn.com
 static04-cms-fame.gammacdn.com
+statuspage.io
 stoitercoppin.cfd
 stripe.com
 stripe.network
@@ -217,6 +227,8 @@ www.gstatic.com
 www.spotify.com
 xfltd.cc
 xfltd.org
+xhscdn.com
+xiaohongshu.com
 z.ai
 zencdn.net
 zhihu.com

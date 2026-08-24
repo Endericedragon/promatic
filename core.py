@@ -58,6 +58,7 @@ async def handle_http(
             )
         except Exception as e:
             LOGGER.error(f"[🚀HErr0] {type(e).__name__} {host}:{port}")
+            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return
     # 3. 开始通信
     try:
@@ -90,8 +91,11 @@ async def handle_http(
     except Exception as e:  # 只会被FakeDirectError触发
         LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr1] {e} {host}:{port}")
         if not use_proxy:
-            # 3.3 如果命中直连规则但无法成功的，记为代理
+            # 3.3.1 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
+        else:
+            # 3.3.2 如果命中代理规则但无法成功的，记为分支节点
+            TRIE.insert(host, NodeStatus.BRANCH)
     finally:
         await safe_close(target_writer)
 
