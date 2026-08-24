@@ -1,6 +1,4 @@
 import asyncio as aio
-import signal
-from sys import platform as current_platform
 from urllib.parse import urlparse
 
 from consts import (
@@ -17,7 +15,6 @@ from io_utils import (
     bidirectional_pipe,
     read_headers,
     safe_close,
-    ignore_windows_socket_reset,
 )
 from log_utils import get_logger
 
@@ -37,7 +34,9 @@ async def handle_http(
     若port为None，则自动使用80端口。
     """
     port = port or 80
-    use_proxy = TRIE.search(host) == NodeStatus.PROXY
+    trie_search_result = TRIE.search(host)
+    use_proxy = trie_search_result == NodeStatus.PROXY
+    has_record = trie_search_result != NodeStatus.BRANCH
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
@@ -47,7 +46,7 @@ async def handle_http(
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
-            LOGGER.warning(f"[✅HErr] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(f"[✅HErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.PROXY)
             use_proxy = True
     # 2. 若直连失败或命中代理规则
@@ -58,7 +57,7 @@ async def handle_http(
                 timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
-            LOGGER.error(f"[🚀HErr] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[🚀HErr0] {type(e).__name__} {host}:{port}")
             return
     # 3. 开始通信
     try:
@@ -70,10 +69,12 @@ async def handle_http(
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
             global LOGGER, TRIE
             nonlocal use_proxy
-            if use_proxy:
-                LOGGER.info("[🚀H] {}:{}".format(host, port))
+            msg = f"[{'🚀' if use_proxy else '✅'}H] {host}:{port}"
+            if has_record:
+                LOGGER.debug(msg)
             else:
-                LOGGER.info("[✅H] {}:{}".format(host, port))
+                LOGGER.info(msg)
+            if not use_proxy:
                 # 首包通信成功，才能放心将其标记为直连
                 TRIE.insert(host, NodeStatus.DIRECT)
 
@@ -87,10 +88,12 @@ async def handle_http(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr2] {e} {host}:{port}")
+        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr1] {e} {host}:{port}")
         if not use_proxy:
             # 3.3 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
+    finally:
+        await safe_close(target_writer)
 
 
 async def handle_https(
@@ -104,7 +107,9 @@ async def handle_https(
     先尝试直连服务器，若超时则换成代理访问
     """
     port = port or 443
-    use_proxy = TRIE.search(host) == NodeStatus.PROXY
+    trie_search_result = TRIE.search(host)
+    use_proxy = trie_search_result == NodeStatus.PROXY
+    has_record = trie_search_result != NodeStatus.BRANCH
     # 1. 先尝试直连服务器
     if not use_proxy:
         try:
@@ -114,7 +119,7 @@ async def handle_https(
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 记录日志并切换为代理
-            LOGGER.warning(f"[✅HSErr] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(f"[✅HSErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.PROXY)
             use_proxy = True
 
@@ -125,6 +130,10 @@ async def handle_https(
                 aio.open_connection("127.0.0.1", get_backend_port()),
                 timeout=MAX_PROXY_TIMEOUT,
             )
+        except Exception as e:
+            LOGGER.error(f"[🚀HSErr0] {type(e).__name__} {host}:{port}")
+            return
+        try:
             # 2.1 构造代理请求
             PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
             target_writer.write(PROXY_REQUEST.encode("latin1"))
@@ -134,7 +143,7 @@ async def handle_https(
             if not result or b"200" not in result:
                 raise Exception()  # 2.2.1 强制跳转到except
         except Exception as e:
-            LOGGER.error(f"[🚀HSErr] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[🚀HSErr1] {type(e).__name__} {host}:{port}")
             await safe_close(target_writer)
             return
     # 3. 开始通信
@@ -147,11 +156,12 @@ async def handle_https(
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
             global LOGGER, TRIE
             nonlocal use_proxy
-            if use_proxy:
-                LOGGER.info("[🚀HS] {}:{}".format(host, port))
-                # 已经在前面将域名记录为代理
+            msg = f"[{'🚀' if use_proxy else '✅'}HS] {host}:{port}"
+            if has_record:
+                LOGGER.debug(msg)
             else:
-                LOGGER.info("[✅HS] {}:{}".format(host, port))
+                LOGGER.info(msg)
+            if not use_proxy:
                 # 首包通信成功，才能放心将其标记为直连
                 TRIE.insert(host, NodeStatus.DIRECT)
 
@@ -209,45 +219,23 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
         await safe_close(writer)
 
 
-async def set_signals_and_run(stop_event: aio.Event):
-    """设置信号处理函数并运行异步循环。"""
-    loop = aio.get_running_loop()
-    loop.set_exception_handler(ignore_windows_socket_reset)
-
-    def __handle_signal():
-        nonlocal stop_event
-        LOGGER.info("Signal received!")
-        stop_event.set()
-
-    if current_platform == "win32":
-        signal.signal(signal.SIGINT, lambda *_: __handle_signal())
-        signal.signal(signal.SIGTERM, lambda *_: __handle_signal())
-    else:
-        loop.add_signal_handler(signal.SIGINT, __handle_signal)
-        loop.add_signal_handler(signal.SIGTERM, __handle_signal)
-
-    await main_task(stop_event)
-
-
-async def main_task(stop_event: aio.Event):
+async def main_logic(stop_event: aio.Event):
+    """代理服务器的主逻辑。
+    负责规则的加载和持久化，启动和停止代理服务器。
+    """
+    load_memo(TRIE)
     proxy_server = await aio.start_server(start_proxy_server, "127.0.0.1", get_port())
     LOGGER.info("Proxy server started on 127.0.0.1:{}".format(get_port()))
     async with proxy_server:
         await stop_event.wait()
-        write_memo(TRIE)  # 持久化
         LOGGER.info("Stopping proxy server...")
-        proxy_server.close()
-        await proxy_server.wait_closed()
-
-
-if __name__ == "__main__":
-    stop_event = aio.Event()
-    load_memo(TRIE)
-    try:
-        aio.run(set_signals_and_run(stop_event))
-    except KeyboardInterrupt as e:
-        pass
-    except Exception as e:
-        LOGGER.error("Unknown error:", type(e).__name__)
-    finally:
-        LOGGER.info("Shutting down proxy server...")
+        # async with会自动关闭服务器
+        # proxy_server.close()
+        # await proxy_server.wait_closed()
+        current_task = aio.current_task()
+        active_tasks = filter(lambda t: t is not current_task, aio.all_tasks())
+        for each in active_tasks:
+            each.cancel()
+        if active_tasks:
+            await aio.gather(*active_tasks, return_exceptions=True)
+        write_memo(TRIE)  # 持久化

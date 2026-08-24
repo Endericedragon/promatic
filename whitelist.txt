@@ -43,6 +43,7 @@ bootstrapcdn.com
 bulgershoe.qpon
 bushilydoddies.qpon
 bytepluscdn.com
+cdb.cn
 cdn-apple.com
 cdn.consentmanager.net
 cdn.donmai.us
@@ -103,6 +104,7 @@ hdslb.com
 hembed.com
 hf-mirror.com
 hf.co
+htwx.net
 iamport.kr
 ic-st-nss.xhcdn.com
 ic-ut-nss.xhcdn.com
@@ -146,6 +148,7 @@ pstatp.com
 push.services.mozilla.com
 pximg.net
 qcloud.com
+qianwen.com
 qixin.com
 qq.com
 r.bing.com

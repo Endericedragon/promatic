@@ -3,7 +3,9 @@ from enum import Enum
 from pathlib import Path
 from typing import Deque, Dict, List
 
-import logging
+from log_utils import get_logger
+
+LOGGER = get_logger()
 
 
 class NodeStatus(Enum):
@@ -127,7 +129,7 @@ class DomainTrie:
             else:
                 msg = "LEAF"
 
-            logging.debug(
+            LOGGER.debug(
                 "| " * depth
                 + ".".join(path)
                 + " [{}, {}]".format(repr(node.status), msg)
@@ -164,7 +166,7 @@ class DomainTrie:
                     aggregated_as = NodeStatus.PROXY
                 # 1.3 报告聚合结果
                 if aggregated_as != NodeStatus.BRANCH:
-                    logging.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
+                    LOGGER.info("聚合为{}: {}".format(repr(aggregated_as), cur_path))
                     return
             # 2. 好吧，不能聚合
             # 2.1 节点自己是否对应某条规则？

@@ -4,8 +4,7 @@ from threading import Thread
 from tkinter import Tk
 
 from consts import TRIE, get_backend_port, get_port, set_backend_port, set_port
-from core import main_task
-from domain_trie import load_memo, write_memo
+from core import main_logic
 from io_utils import ignore_windows_socket_reset
 from log_utils import get_logger
 
@@ -53,7 +52,7 @@ class GUI:
         aio.set_event_loop(self.loop)
         self.stop_signal = aio.Event()
         try:
-            self.loop.run_until_complete(main_task(self.stop_signal))
+            self.loop.run_until_complete(main_logic(self.stop_signal))
         except Exception as e:
             LOGGER.error(e)
         finally:
@@ -86,7 +85,6 @@ class GUI:
                 LOGGER.error("Invalid port number")
                 self.start_button.config(text="端口号错误")
                 return
-            load_memo(TRIE)
             self.stopped = False
             self.start_button.config(text="停止代理")
             self.input_port.config(state="disabled")
@@ -98,7 +96,6 @@ class GUI:
             if self.loop and self.loop.is_running() and self.stop_signal:
                 self.loop.call_soon_threadsafe(self.stop_signal.set)
             self.start_button.config(text="停止中……")
-            write_memo(TRIE)
 
     def mainloop(self):
         self.root.update_idletasks()
