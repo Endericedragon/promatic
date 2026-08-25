@@ -1,5 +1,6 @@
 from collections import deque
 from enum import Enum
+from operator import is_
 from pathlib import Path
 from typing import Deque, Dict, List
 
@@ -53,15 +54,20 @@ class TrieNode:
 class DomainTrie:
     def __init__(self):
         self.root: TrieNode = TrieNode(NodeStatus.BRANCH)
+        self.is_dirty: bool = False
+        self.path_whitelist = Path("whitelist.txt")
+        self.path_blacklist = Path("blacklist.txt")
 
     def insert(self, domain: str, status: NodeStatus):
         """倒序插入域名，例如 a.google.com -> 插入路径: com -> google -> a"""
+
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
         path_nodes: List[TrieNode] = [node]  # 插入路径，包含最终节点
 
         for part in parts:
             if part not in node.children:
+                self.is_dirty = True
                 # 默认插入叶子节点
                 node.children[part] = TrieNode(NodeStatus.BRANCH)
             # 前往其对应的子节点
@@ -73,6 +79,7 @@ class DomainTrie:
             # 无需更改任何信息
             return
         # 说明新插入的域名更改了状态，需要更新路径上各个节点的计数
+        self.is_dirty = True
         node.status = status
         for nn in path_nodes:
             # 1. 删除旧状态
@@ -143,6 +150,7 @@ class DomainTrie:
 
     def compress_and_collect(self):
         """遍历并聚合规则"""
+
         direct_ok_suffixes: List[str] = list()
         proxy_needed_suffixes: List[str] = list()
 
@@ -186,35 +194,58 @@ class DomainTrie:
         dfs(self.root, deque())
         return direct_ok_suffixes, proxy_needed_suffixes
 
+    def __save_memo(self):
+        """存储 Trie 规则到硬盘"""
 
-def load_memo(trie: DomainTrie):
-    whitelist_path = Path("whitelist.txt")
-    blacklist_path = Path("blacklist.txt")
+        whitelist, blacklist = self.compress_and_collect()
+        with open(self.path_whitelist, "w", encoding="utf-8") as f:
+            for each in sorted(whitelist, key=lambda x: (x, -len(x))):
+                print(each, file=f)
+        with open(self.path_blacklist, "w", encoding="utf-8") as f:
+            for each in sorted(blacklist, key=lambda x: (x, -len(x))):
+                print(each, file=f)
+        self.is_dirty = False
 
-    def mark_as(pp: Path, stat: NodeStatus):
-        nonlocal trie
-        if pp.exists() and pp.is_file():
-            for each in pp.read_text(encoding="utf-8").splitlines():
-                if each:  # 过滤空行
-                    trie.insert(each, stat)
-        else:
-            pp.touch()
+    def safely_save_memo(self) -> bool:
+        """安全存储 Trie 规则到硬盘"""
+        if not self.is_dirty:
+            return False
+        # 1. 备份当前规则
+        backup_wlist = self.path_whitelist.rename(
+            self.path_whitelist.with_suffix(".bak")
+        )
+        backup_blist = self.path_blacklist.rename(
+            self.path_blacklist.with_suffix(".bak")
+        )
+        try:
+            self.__save_memo()
+        except:
+            # 2. 恢复备份文件
+            backup_wlist.rename(self.path_whitelist)
+            backup_blist.rename(self.path_blacklist)
+            return False
+        # 3. 一切如常，删除备份文件
+        backup_wlist.unlink()
+        backup_blist.unlink()
+        return True
 
-    mark_as(whitelist_path, NodeStatus.DIRECT)
-    mark_as(blacklist_path, NodeStatus.PROXY)
+    def load_memo(self):
+        """从硬盘加载 Trie 规则"""
+
+        def mark_as(pp: Path, stat: NodeStatus):
+            if pp.exists() and pp.is_file():
+                for each in pp.read_text(encoding="utf-8").splitlines():
+                    if each:  # 过滤空行
+                        self.insert(each, stat)
+            else:
+                pp.touch()
+
+        mark_as(self.path_whitelist, NodeStatus.DIRECT)
+        mark_as(self.path_blacklist, NodeStatus.PROXY)
+        self.is_dirty = False
 
 
-def write_memo(trie: DomainTrie):
-    whitelist, blacklist = trie.compress_and_collect()
-    with open("whitelist.txt", "w", encoding="utf-8") as f:
-        for each in sorted(whitelist, key=lambda x: (x, -len(x))):
-            print(each, file=f)
-    with open("blacklist.txt", "w", encoding="utf-8") as f:
-        for each in sorted(blacklist, key=lambda x: (x, -len(x))):
-            print(each, file=f)
-
-
-def test():
+if __name__ == "__main__":
     trie = DomainTrie()
     trie.insert("www.apple.com.cn", NodeStatus.DIRECT)
     trie.insert("www.google.com", NodeStatus.PROXY)
@@ -225,7 +256,3 @@ def test():
     print(res[0])
     print(res[1])
     print(trie.search("google.com"))
-
-
-if __name__ == "__main__":
-    test()

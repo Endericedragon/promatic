@@ -10,7 +10,7 @@ from consts import (
     get_backend_port,
     get_port,
 )
-from domain_trie import NodeStatus, load_memo, write_memo
+from domain_trie import NodeStatus
 from io_utils import (
     bidirectional_pipe,
     read_headers,
@@ -225,11 +225,24 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
         await safe_close(writer)
 
 
+async def autosave_trie(interval_sec: int = 60):
+    while True:
+        try:
+            await aio.sleep(interval_sec)
+            if TRIE.safely_save_memo():
+                LOGGER.debug("[AutoSave] Rules saved successfully.")
+        except aio.CancelledError:
+            break
+        except Exception as e:
+            LOGGER.error(f"[AutoSaveErr] {type(e).__name__}: {e}")
+
+
 async def main_logic(stop_event: aio.Event):
     """代理服务器的主逻辑。
     负责规则的加载和持久化，启动和停止代理服务器。
     """
-    load_memo(TRIE)
+    TRIE.load_memo()
+    save_task = aio.create_task(autosave_trie())
     proxy_server = await aio.start_server(start_proxy_server, "127.0.0.1", get_port())
     LOGGER.info("Proxy server started on 127.0.0.1:{}".format(get_port()))
     async with proxy_server:
@@ -238,10 +251,14 @@ async def main_logic(stop_event: aio.Event):
         # async with会自动关闭服务器
         # proxy_server.close()
         # await proxy_server.wait_closed()
+        # 1. 确定当前任务（主任务）
         current_task = aio.current_task()
+        # 2. 取消所有其他任务
+        save_task.cancel()
         active_tasks = filter(lambda t: t is not current_task, aio.all_tasks())
         for each in active_tasks:
             each.cancel()
         if active_tasks:
             await aio.gather(*active_tasks, return_exceptions=True)
-        write_memo(TRIE)  # 持久化
+        # 3. 存储规则
+        TRIE.safely_save_memo()  # 持久化

@@ -73,7 +73,6 @@ class GUI:
         self.input_backend_port.config(state="normal")
 
     def handle_click(self):
-        global TRIE
         if self.stopped:
             # 未启动，准备启动
             try:
