@@ -153,9 +153,10 @@ class DomainTrie:
 
         direct_ok_suffixes: List[str] = list()
         proxy_needed_suffixes: List[str] = list()
+        acc: int = 0
 
         def dfs(node: TrieNode, path: Deque[str]):
-            nonlocal direct_ok_suffixes, proxy_needed_suffixes
+            nonlocal direct_ok_suffixes, proxy_needed_suffixes, acc
             # 0. 准备
             if node.count_direct + node.count_proxy == 0:
                 # 节点无效（自己是BRANCH，同时其下要么没子节点，要么也都是BRANCH）
@@ -174,7 +175,7 @@ class DomainTrie:
                     aggregated_as = NodeStatus.PROXY
                 # 1.3 报告聚合结果
                 if aggregated_as != NodeStatus.BRANCH:
-                    LOGGER.debug("聚合为{}: {}".format(repr(aggregated_as), cur_path))
+                    acc += 1
                     return
             # 2. 好吧，不能聚合
             # 2.1 节点自己是否对应某条规则？
@@ -189,9 +190,8 @@ class DomainTrie:
                 dfs(each, path)
                 path.popleft()
 
-        # for txt, child in self.root.children.items():
-        #     dfs(child, deque([txt]))
         dfs(self.root, deque())
+        LOGGER.info(f"[DomainTree]聚合了{acc}条规则!")
         return direct_ok_suffixes, proxy_needed_suffixes
 
     def __save_memo(self):
