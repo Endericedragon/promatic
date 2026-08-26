@@ -148,6 +148,7 @@ async def handle_https(
                 raise Exception()  # 2.2.1 强制跳转到except
         except Exception as e:
             LOGGER.error(f"[🚀HSErr1] {type(e).__name__} {host}:{port}")
+            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             await safe_close(target_writer)
             return
     # 3. 开始通信

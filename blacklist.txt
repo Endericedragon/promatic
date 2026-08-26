@@ -1,4 +1,6 @@
+08490e6794c8.w.hcaptcha.com
 14cd71487c7f.w.hcaptcha.com
+167.41
 167.92
 1d0675367282.w.hcaptcha.com
 56.166
@@ -13,6 +15,7 @@ amazonaws.com
 anthropic.com
 anxious-pull.pro
 api.hcaptcha.com
+api.userway.org
 apikey.fun
 arena.ai
 asmhentai.com
@@ -37,7 +40,6 @@ cdn.jwplayer.com
 cdn.plyr.io
 cdn1-smallimg.phncdn.com
 cdn1d-static-shared.phncdn.com
-cdn77.api.userway.org
 chatgpt.com
 civitai.com
 civitai.red
@@ -64,6 +66,7 @@ discordapp.net
 dlsite.com
 doppiocdn.com
 duckduckgo.com
+e737650650f4.w.hcaptcha.com
 eatasmr.com
 edge.microsoft.com
 ei.phncdn.com
@@ -85,6 +88,7 @@ firebaseinstallations.googleapis.com
 flaru.com
 flirtify.com
 fonts.googleapis.com
+fonts.loli.net
 g2fame.com
 gammaentertainment.com
 gemini.gstatic.com
@@ -125,6 +129,7 @@ jdh.com
 jingdonghealth.cn
 jnn-pa.googleapis.com
 jspm.io
+kemono.su
 kusart.com
 kxcdn.com
 lmarena.ai

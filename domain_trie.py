@@ -191,7 +191,7 @@ class DomainTrie:
                 path.popleft()
 
         dfs(self.root, deque())
-        LOGGER.info(f"[DomainTree]聚合了{acc}条规则!")
+        LOGGER.info(f"[DomainTrie]聚合了{acc}条规则!")
         return direct_ok_suffixes, proxy_needed_suffixes
 
     def __save_memo(self):
