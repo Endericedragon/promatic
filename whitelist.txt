@@ -1,6 +1,7 @@
 127.net
 163.com
 163yun.com
+53kf.com
 54kefu.net
 720static.com
 720yun.com
@@ -22,6 +23,7 @@ alipay.com
 alipayobjects.com
 aliyuncs.com
 api-partner.spotify.com
+api.userway.org
 apresolve.spotify.com
 archive.mozilla.org
 asmroger.top
@@ -35,12 +37,14 @@ b23.tv
 bacchiccupule.qpon
 baidu.com
 bcebos.com
+bdimg.com
 bdstatic.com
 bilibili.cn
 bilibili.com
 biligame.com
 bilivideo.cn
 bilivideo.com
+bing.net
 bingapis.com
 boniestgobbler.cyou
 bootstrapcdn.com
@@ -55,10 +59,12 @@ bytepluscdn.com
 bytescm.com
 bytetcc.com
 bytetos.com
+camo.githubusercontent.com
 cdb.cn
 cdn-apple.com
 cdn.consentmanager.net
 cdn.donmai.us
+cdn.userway.org
 challenge.spotify.com
 char123.com
 chat.bilibili.com
@@ -78,7 +84,9 @@ cnblogs.com
 codeberg.org
 com.cn
 comfy.org
+conac.cn
 cookielaw.org
+coveo.com
 cravatar.cn
 cravatar.com
 csdn.net
@@ -87,6 +95,7 @@ ctfassets.net
 cuckcapital.cr
 d.delivery.consentmanager.net
 d3a3ewgd1iewwz.cloudfront.net
+darkreader.app
 data.bilibili.com
 datav.run
 ddos-guard.net
@@ -94,6 +103,9 @@ deepseek.com
 dlsite.jp
 douyin.com
 douyinpic.com
+download.amd.com
+edu.cn
+educity.cn
 eisys-bcs.jp
 emule-security.org
 entitlements.jwplayer.com
@@ -114,6 +126,7 @@ fonts.googleapis.com
 fonts.gstatic.com
 frdic.com
 freeimagecdn.net
+fujian.gov.cn
 gae2-spclient.spotify.com
 game.bilibili.com
 geetest.com
@@ -155,6 +168,7 @@ jwpcdn.com
 jwplatform.com
 jyshare.com
 kiko-play-niptan.one
+kuaiwenyun.com
 kusa.pics
 lf-flow-web-cdn.doubao.com
 live.bilibili.com
@@ -162,6 +176,7 @@ live.com
 loli.net
 ly200.com
 magsrv.com
+manga.bilibili.com
 mcs.doubao.com
 message.bilibili.com
 microsoft.com
@@ -182,8 +197,10 @@ oaistatic.com
 oaix.tech
 office.com
 on.aws
+onetrust.io
 open-douyin.com
 opt.doubao.com
+org.cn
 passport.bilibili.com
 pemsrv.com
 perksburian.com
@@ -201,6 +218,7 @@ qcloud.com
 qianwen.com
 qixin.com
 qq.com
+qualified.com
 r2.dev
 rbtab.com
 react.gammacdn.com
@@ -258,17 +276,21 @@ volces.com
 w.org
 w3schools.com
 website-files.com
+webxtsvc.microsoft.com
 wg.spotify.com
 whois.com
 wordpress.com
 www.bilibili.com
 www.doubao.com
+www.gov.cn
 www.gstatic.com
 www.spotify.com
 xfltd.cc
 xfltd.org
 xhscdn.com
 xiaohongshu.com
+xisaiwang.cn
+xisaiwang.com
 yhgfb-cn-static.com
 z.ai
 zencdn.net

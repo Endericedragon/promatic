@@ -1,6 +1,5 @@
 2p66nmmycsj3.statuspage.io
 abyssplayer.com
-accounts.firefox.com
 admamax.com
 ajax.googleapis.com
 aks-prod-japaneast.access-point.cloudmessaging.edge.microsoft.com
@@ -8,7 +7,6 @@ alibow.cn
 amazonaws.com
 anthropic.com
 anxious-pull.pro
-api.bilibili.com
 apikey.fun
 arena.ai
 asmhentai.com
@@ -30,6 +28,7 @@ cdn.jsdelivr.net
 cdn.jwplayer.com
 cdn1-smallimg.phncdn.com
 cdn1d-static-shared.phncdn.com
+cdn77.api.userway.org
 chatgpt.com
 civitai.com
 civitai.red
@@ -42,9 +41,12 @@ copilot.microsoft.com
 coveralls.io
 d3oia8etllorh5.cloudfront.net
 danbooru.donmai.us
+darkreader.org
+deepseek404.com
 detectportal.firefox.com
 developerprofiles-pa.googleapis.com
 dicebear.com
+digitaleast.mobi
 discord.com
 discord.gg
 discordapp.com
@@ -86,6 +88,7 @@ googleusercontent.com
 googlevideo.com
 gravatar.com
 greasyfork.org
+grok.com
 hanime1.me
 hentaiasmr.moe
 heptapod.net
@@ -106,6 +109,7 @@ imgix.net
 iwara.tv
 ixxx.com
 jnn-pa.googleapis.com
+jspm.io
 kusart.com
 lmarena.ai
 login.live.com
@@ -152,6 +156,9 @@ stackoverflow.com
 static03-cms-fame.gammacdn.com
 staticstack.net
 sync.services.mozilla.com
+t0.gstatic.com
+t1.gstatic.com
+t2.gstatic.com
 tbi.sb-cd.com
 tbv.sb-cd.com
 telemetry.mozilla.org
@@ -172,6 +179,8 @@ valid-bottom.com
 views.scientific-python.org
 withgoogle.com
 wss100-normal.doubao.com
+www.amd.com
+x.ai
 x.com
 xhamster.com
 xicons.org
