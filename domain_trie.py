@@ -1,6 +1,5 @@
 from collections import deque
 from enum import Enum
-from operator import is_
 from pathlib import Path
 from typing import Deque, Dict, List
 
@@ -13,6 +12,7 @@ class NodeStatus(Enum):
     BRANCH = 0
     DIRECT = 1
     PROXY = 2
+    FORCE_PROXY = 3
 
     def __repr__(self):
         match self.value:
@@ -20,7 +20,7 @@ class NodeStatus(Enum):
                 return "❔"
             case 1:
                 return "✅"
-            case 2:
+            case 2 | 3:
                 return "🚀"
 
 
@@ -56,6 +56,7 @@ class DomainTrie:
         self.root: TrieNode = TrieNode(NodeStatus.BRANCH)
         self.is_dirty: bool = False
         self.path_whitelist = Path("whitelist.txt")
+        self.path_graylist = Path("graylist.txt")
         self.path_blacklist = Path("blacklist.txt")
 
     def insert(self, domain: str, status: NodeStatus):
@@ -75,15 +76,15 @@ class DomainTrie:
             path_nodes.append(node)
 
         old_status = node.status
-        if old_status == status:
-            # 无需更改任何信息
+        if old_status == status or old_status == NodeStatus.FORCE_PROXY:
+            # 无需/不准更改任何信息
             return
         # 说明新插入的域名更改了状态，需要更新路径上各个节点的计数
         self.is_dirty = True
         node.status = status
         for nn in path_nodes:
             # 1. 删除旧状态
-            if old_status == NodeStatus.PROXY:
+            if old_status == NodeStatus.PROXY:  # todo
                 nn.count_proxy -= 1
             elif old_status == NodeStatus.DIRECT:
                 nn.count_direct -= 1
@@ -201,7 +202,7 @@ class DomainTrie:
         with open(self.path_whitelist, "w", encoding="utf-8") as f:
             for each in sorted(whitelist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
-        with open(self.path_blacklist, "w", encoding="utf-8") as f:
+        with open(self.path_graylist, "w", encoding="utf-8") as f:
             for each in sorted(blacklist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
         self.is_dirty = False
@@ -214,15 +215,15 @@ class DomainTrie:
         backup_wlist = self.path_whitelist.rename(
             self.path_whitelist.with_suffix(".bak")
         )
-        backup_blist = self.path_blacklist.rename(
-            self.path_blacklist.with_suffix(".bak")
+        backup_blist = self.path_graylist.rename(
+            self.path_graylist.with_suffix(".bak")
         )
         try:
             self.__save_memo()
         except:
             # 2. 恢复备份文件
             backup_wlist.rename(self.path_whitelist)
-            backup_blist.rename(self.path_blacklist)
+            backup_blist.rename(self.path_graylist)
             return False
         # 3. 一切如常，删除备份文件
         backup_wlist.unlink()
@@ -241,7 +242,7 @@ class DomainTrie:
                 pp.touch()
 
         mark_as(self.path_whitelist, NodeStatus.DIRECT)
-        mark_as(self.path_blacklist, NodeStatus.PROXY)
+        mark_as(self.path_graylist, NodeStatus.PROXY)
         self.is_dirty = False
 
 
