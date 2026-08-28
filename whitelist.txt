@@ -63,6 +63,7 @@ cdn-apple.com
 cdn-go.cn
 cdn.consentmanager.net
 cdn.userway.org
+cfp.microsoft.com
 challenge.spotify.com
 chat.bilibili.com
 chatboxai.app
@@ -95,6 +96,7 @@ d3a3ewgd1iewwz.cloudfront.net
 darkreader.app
 darkreader.org
 data.bilibili.com
+data.microsoft.com
 datav.run
 ddos-guard.net
 deepseek.com
@@ -129,6 +131,7 @@ firefox.com
 firefoxusercontent.com
 fontawesome.com
 fonts.gstatic.com
+fpt.microsoft.com
 frdic.com
 freeimagecdn.net
 gae2-spclient.spotify.com
@@ -198,6 +201,7 @@ magsrv.com
 manga.bilibili.com
 message.bilibili.com
 microsoft.com
+microsoftapp.net
 microsoftonline.com
 mojidict.com
 mountaintoys.cn
@@ -205,6 +209,7 @@ mozilla.com
 mozilla.net
 mozilla.org
 mp4-cdn77.xvideos-cdn.com
+msauth.net
 msedgedevtools.microsoft.com
 msn.cn
 msn.com
@@ -250,6 +255,7 @@ recaptcha.net
 redditspace.com
 rewardsplatform.microsoft.com
 rplay.live
+runoob.com
 sanpoiljejuna.cfd
 scdn.co
 scientific-python.org
@@ -277,6 +283,7 @@ static01-cms-fame.gammacdn.com
 static04-cms-fame.gammacdn.com
 statuspage.io
 stoitercoppin.cfd
+storage.live.com
 stripe.com
 stripe.network
 suganndiesisagoho.cyou
@@ -311,10 +318,12 @@ volccdn.com
 volces.com
 w.hcaptcha.com
 w.org
+wcpstatic.microsoft.com
 website-files.com
 webxtsvc.microsoft.com
 wg.spotify.com
 whois.com
+windows.net
 wordpress.com
 www.bilibili.com
 www.gstatic.com

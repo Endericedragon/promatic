@@ -9,12 +9,10 @@ aibooru.online
 ajax.googleapis.com
 alibow.cn
 amazonaws.com
-anthropic.com
 anxious-pull.pro
 api.bilibili.com
 api.userway.org
 apikey.fun
-arena.ai
 asmhentai.com
 asmr-200.com
 asmr-cn2.fyi
@@ -23,9 +21,6 @@ asmr.one
 asmrjp.org
 asmroger.com
 asmrpleasure.com
-bing.com
-bing.net
-bingapis.com
 bkcdn.net
 blacklist.tampermonkey.net
 blogger.com
@@ -41,8 +36,6 @@ cdn1d-static-shared.phncdn.com
 chatgpt.com
 civitai.com
 civitai.red
-claude.ai
-claude.com
 cloudflare.com
 cloudflarestorage.com
 cloudfunctions.net
@@ -129,8 +122,8 @@ jspm.io
 kemono.su
 kusart.com
 kxcdn.com
-lmarena.ai
-lmarena.com
+login.live.com
+login.microsoftonline.com
 loveasmr.com
 medium.com
 morencius.com
@@ -141,7 +134,6 @@ nikabow.com
 onetrust.com
 onlyfans.com
 open.spotify.com
-openai.com
 ourdream.ai
 p.htwx.net
 p11-volcsearch-sign.byteimg.com

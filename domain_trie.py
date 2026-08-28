@@ -34,6 +34,7 @@ class TrieNode:
         status: 节点状态
         count_proxy: 节点及其子节点中，代理节点的数量
         count_direct: 节点及其子节点中，直连节点的数量
+        count_force_proxy: 节点及其子节点中，强制代理节点的数量
     """
 
     def __init__(self, nstat: NodeStatus):
@@ -41,16 +42,17 @@ class TrieNode:
         self.status = nstat
         self.count_proxy: int = 0
         self.count_direct: int = 0
+        self.count_force_proxy: int = 0
 
     @property
     def is_pure_proxy(self) -> bool:
         """判断该节点及其子节点是否全为代理节点"""
-        return self.count_proxy > 0 and self.count_direct == 0
+        return self.count_proxy > 0 and self.count_direct + self.count_force_proxy == 0
 
     @property
     def is_pure_direct(self) -> bool:
         """判断该节点及其子节点是否全为直连节点"""
-        return self.count_proxy == 0 and self.count_direct > 0
+        return self.count_proxy == 0 and self.count_direct + self.count_force_proxy > 0
 
 
 class DomainTrie:
@@ -90,15 +92,16 @@ class DomainTrie:
             # 1. 删除旧状态
             if old_status == NodeStatus.DIRECT:
                 nn.count_direct -= 1
-            elif old_status != NodeStatus.BRANCH:
-                # 不是BRANCH，又排除了DIRECT，只能是代理或强制代理
+            elif old_status == NodeStatus.PROXY:
                 nn.count_proxy -= 1
+            # old_status不可能等于FORCE_PROXY，因为在之前就return了
             # 2. 添加新状态
             if status == NodeStatus.DIRECT:
                 nn.count_direct += 1
-            elif status != NodeStatus.BRANCH:
-                # 不是BRANCH，又排除了DIRECT，只能是代理或强制代理
+            elif status == NodeStatus.PROXY:
                 nn.count_proxy += 1
+            elif status == NodeStatus.FORCE_PROXY:
+                nn.count_force_proxy += 1
 
     def search(self, domain: str) -> NodeStatus:
         """搜索域名，返回其匹配或聚合后的状态
@@ -130,29 +133,6 @@ class DomainTrie:
         # 3. 实在没辙
         return last_matched_status
 
-    def view_tree(self):
-        """查看 Trie 树结构"""
-
-        def dfs(node: TrieNode, path: Deque[str], depth: int = 0):
-            if node.count_direct and node.count_proxy:
-                msg = ""
-            elif node.count_direct:
-                msg = "PureDirect"
-            elif node.count_proxy:
-                msg = "PureProxy"
-            else:
-                msg = "LEAF"
-
-            LOGGER.debug(
-                "| " * depth
-                + ".".join(path)
-                + " [{}, {}]".format(repr(node.status), msg)
-            )
-            for txt, each in node.children.items():
-                path.appendleft(txt)
-                dfs(each, path, depth + 1)
-                path.popleft()
-
         dfs(self.root, deque())
 
     def compress_and_collect(self):
@@ -165,7 +145,7 @@ class DomainTrie:
         def dfs(node: TrieNode, path: Deque[str]):
             nonlocal whitelist_suffixes, graylist_suffixes, acc
             # 0. 准备
-            if node.count_direct + node.count_proxy == 0:
+            if node.count_direct + node.count_proxy + node.count_force_proxy == 0:
                 # 节点无效（自己是BRANCH，同时其下要么没子节点，要么也都是BRANCH）
                 return
             cur_path = ".".join(path)
@@ -250,16 +230,3 @@ class DomainTrie:
         # 3. 加载强制代理规则
         mark_as(self.path_blacklist, NodeStatus.FORCE_PROXY)
         self.is_dirty = False
-
-
-if __name__ == "__main__":
-    trie = DomainTrie()
-    trie.insert("www.apple.com.cn", NodeStatus.DIRECT)
-    trie.insert("www.google.com", NodeStatus.PROXY)
-    trie.insert("account.google.com", NodeStatus.PROXY)
-    trie.insert("www.baidu.com", NodeStatus.DIRECT)
-    trie.view_tree()
-    res = trie.compress_and_collect()
-    print(res[0])
-    print(res[1])
-    print(trie.search("google.com"))

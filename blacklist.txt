@@ -3,6 +3,7 @@ claude.ai
 claude.com
 arena.ai
 lmarena.com
+lmarena.ai
 anthropic.com
 bing.com
 bing.net
