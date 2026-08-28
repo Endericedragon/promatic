@@ -28,9 +28,9 @@ def default_tray_icon() -> Image.Image:
         outline="orange",
         width=10,
     )
-    rect_size: int = 24
+    rect_size: int = 20
     draw.rectangle(
-        (0, max_size - rect_size, max_size, rect_size),
+        (0, max_size - rect_size, rect_size, max_size),
         fill="white",
     )
     draw.rectangle(

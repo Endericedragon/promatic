@@ -1,3 +1,4 @@
+import unittest
 from collections import deque
 from enum import Enum
 from pathlib import Path
@@ -230,3 +231,16 @@ class DomainTrie:
         # 3. 加载强制代理规则
         mark_as(self.path_blacklist, NodeStatus.FORCE_PROXY)
         self.is_dirty = False
+
+
+class TestDomainTrie(unittest.TestCase):
+    def test_insert_force_proxy(self):
+        trie = DomainTrie()
+        trie.load_memo()
+        trie.insert("arena.ai", NodeStatus.DIRECT)  # 应该不变
+        trie.insert("arena.ai", NodeStatus.BRANCH)  # 应该不变
+        assert trie.search("arena.ai") == NodeStatus.FORCE_PROXY
+
+
+if __name__ == "__main__":
+    unittest.main()

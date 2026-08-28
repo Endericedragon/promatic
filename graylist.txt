@@ -21,7 +21,6 @@ asmr.one
 asmrjp.org
 asmroger.com
 asmrpleasure.com
-auth.wikimedia.org
 bkcdn.net
 blacklist.tampermonkey.net
 blogger.com
@@ -59,6 +58,7 @@ dlsite.com
 doppiocdn.com
 duckduckgo.com
 eatasmr.com
+edge.microsoft.com
 ei.phncdn.com
 embark.link
 emojitracker.com
@@ -129,6 +129,7 @@ loveasmr.com
 medium.com
 morencius.com
 morphify.net
+mp.microsoft.com
 myip.com
 nhentai.net
 nikabow.com
@@ -191,9 +192,9 @@ twitch.tv
 twitter.com
 ublockorigin.github.io
 uns.wtf
-upload.wikimedia.org
 valid-bottom.com
 views.scientific-python.org
+wikimedia.org
 wikipedia.org
 withgoogle.com
 www.amd.com
