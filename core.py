@@ -11,11 +11,7 @@ from consts import (
     get_port,
 )
 from domain_trie import NodeStatus
-from io_utils import (
-    bidirectional_pipe,
-    read_headers,
-    safe_close,
-)
+from io_utils import bidirectional_pipe, read_headers, safe_close
 from log_utils import get_logger
 
 LOGGER = get_logger()
@@ -34,7 +30,7 @@ async def handle_conn_unified(
     is_https = header_bytes is None
     port = port or (443 if is_https else 80)
     trie_search_result = TRIE.search(host)
-    log_icon = repr(trie_search_result) + "S" if is_https else "H"  # 用于日志图标
+    log_icon = repr(trie_search_result) + ("S" if is_https else "H")  # 用于日志图标
     use_proxy = trie_search_result in {NodeStatus.PROXY, NodeStatus.FORCE_PROXY}
     has_record = trie_search_result != NodeStatus.BRANCH
 
@@ -47,9 +43,11 @@ async def handle_conn_unified(
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
-            LOGGER.warning(f"[{log_icon}Err-TryDirect] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(
+                f"[{log_icon}Err-TryDirect] {type(e).__name__} {host}:{port}"
+            )
             TRIE.insert(host, NodeStatus.PROXY)
-            log_icon = repr(NodeStatus.PROXY) + "S" if is_https else "H"
+            log_icon = repr(NodeStatus.PROXY) + ("S" if is_https else "H")
             use_proxy = True
     # 2. 若直连失败或命中代理规则
     if use_proxy:
@@ -74,7 +72,9 @@ async def handle_conn_unified(
                 if not result or b"200" not in result:
                     raise Exception()  # 2.2.1 强制跳转到except
             except Exception as e:
-                LOGGER.error(f"[{log_icon}Err-TryHTTPSConn] {type(e).__name__} {host}:{port}")
+                LOGGER.error(
+                    f"[{log_icon}Err-TryHTTPSConn] {type(e).__name__} {host}:{port}"
+                )
                 TRIE.insert(
                     host, NodeStatus.BRANCH
                 )  # 走直连和代理都不行，标记为分支节点
@@ -82,11 +82,15 @@ async def handle_conn_unified(
                 return
     # 3. 开始通信
     try:
-        # 3.1 若是HTTPS，则告诉用户，代理连接已建立；否则转发请求头即可
-        writer.write(
-            CONN_ESABLISHED.encode("latin1") if header_bytes is None else header_bytes
-        )
-        await writer.drain()
+        # 3.1 若是HTTPS，则告诉用户，代理连接已建立
+        if is_https:
+            writer.write(CONN_ESABLISHED.encode("latin1"))
+            await writer.drain()
+        # 3.1 否则，向远端转发请求头即可
+        else:
+            assert header_bytes is not None
+            target_writer.write(header_bytes)
+            await target_writer.drain()
 
         # 3.2 然后让用户和目标直接双向通信
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了

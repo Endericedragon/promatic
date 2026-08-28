@@ -25,6 +25,8 @@ class NodeStatus(Enum):
                 return "🚀"
             case 3:
                 return "🔒"
+            case _:
+                return f"NodeStatus({self.value})"
 
 
 class TrieNode:
@@ -53,7 +55,7 @@ class TrieNode:
     @property
     def is_pure_direct(self) -> bool:
         """判断该节点及其子节点是否全为直连节点"""
-        return self.count_proxy == 0 and self.count_direct + self.count_force_proxy > 0
+        return self.count_direct > 0 and self.count_proxy + self.count_force_proxy > 0
 
 
 class DomainTrie:

@@ -8,7 +8,7 @@ CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
 
 MAX_DIRECT_TIMEOUT: float = 2.0  # 直连超时时间
-MAX_PROXY_TIMEOUT: float = 5.0  # 代理超时时间
+MAX_PROXY_TIMEOUT: float = 8.0  # 代理超时时间
 MAX_RETRY: int = 3  # 最大重试次数
 
 
