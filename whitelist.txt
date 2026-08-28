@@ -48,8 +48,6 @@ biligame.com
 biliimg.com
 bilivideo.cn
 bilivideo.com
-bing.net
-bingapis.com
 boniestgobbler.cyou
 bootstrapcdn.com
 bulgershoe.qpon
@@ -138,7 +136,6 @@ game.bilibili.com
 geetest.com
 gitcode.com
 gitcode.host
-gitcode.net
 github.io
 githubassets.com
 githubcopilot.com

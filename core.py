@@ -21,6 +21,16 @@ from log_utils import get_logger
 LOGGER = get_logger()
 
 
+async def handle_conn_unified(
+    reader: aio.StreamReader,
+    writer: aio.StreamWriter,
+    host: str,
+    port: int | None,
+    header_bytes: bytearray | None,
+):
+    pass
+
+
 async def handle_http(
     reader: aio.StreamReader,
     writer: aio.StreamWriter,
@@ -35,6 +45,7 @@ async def handle_http(
     """
     port = port or 80
     trie_search_result = TRIE.search(host)
+    log_icon = repr(trie_search_result)  # 用于日志图标
     use_proxy = trie_search_result == NodeStatus.PROXY
     has_record = trie_search_result != NodeStatus.BRANCH
     # 1. 先尝试直连服务器
@@ -46,8 +57,9 @@ async def handle_http(
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
-            LOGGER.warning(f"[✅HErr0] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(f"[{log_icon}HErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.PROXY)
+            log_icon = repr(NodeStatus.PROXY)
             use_proxy = True
     # 2. 若直连失败或命中代理规则
     if use_proxy:
@@ -57,7 +69,7 @@ async def handle_http(
                 timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
-            LOGGER.error(f"[🚀HErr0] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[{log_icon}HErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return
     # 3. 开始通信
@@ -70,7 +82,7 @@ async def handle_http(
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
             global LOGGER, TRIE
             nonlocal use_proxy
-            msg = f"[{'🚀' if use_proxy else '✅'}H] {host}:{port}"
+            msg = f"[{log_icon}H] {host}:{port}"
             if has_record:
                 LOGGER.debug(msg)
             else:
@@ -89,7 +101,7 @@ async def handle_http(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HErr1] {e} {host}:{port}")
+        LOGGER.warning(f"[{log_icon}HErr1] {e} {host}:{port}")
         if not use_proxy:
             # 3.3.1 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
@@ -111,7 +123,8 @@ async def handle_https(
     """
     port = port or 443
     trie_search_result = TRIE.search(host)
-    use_proxy = trie_search_result == NodeStatus.PROXY
+    log_icon = repr(trie_search_result)  # 用于日志图标
+    use_proxy = trie_search_result in {NodeStatus.PROXY, NodeStatus.FORCE_PROXY}
     has_record = trie_search_result != NodeStatus.BRANCH
     # 1. 先尝试直连服务器
     if not use_proxy:
@@ -122,9 +135,10 @@ async def handle_https(
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 标记为需要代理，并切换到代理
-            LOGGER.warning(f"[✅HSErr0] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(f"[{log_icon}HSErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.PROXY)
             use_proxy = True
+            log_icon = repr(NodeStatus.PROXY)
 
     # 2. 若直连失败或命中代理规则
     if use_proxy:
@@ -134,7 +148,7 @@ async def handle_https(
                 timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
-            LOGGER.error(f"[🚀HSErr0] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[{log_icon}HSErr0] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return
         try:
@@ -147,7 +161,7 @@ async def handle_https(
             if not result or b"200" not in result:
                 raise Exception()  # 2.2.1 强制跳转到except
         except Exception as e:
-            LOGGER.error(f"[🚀HSErr1] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[{log_icon}HSErr1] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             await safe_close(target_writer)
             return
@@ -161,7 +175,7 @@ async def handle_https(
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
             global LOGGER, TRIE
             nonlocal use_proxy
-            msg = f"[{'🚀' if use_proxy else '✅'}HS] {host}:{port}"
+            msg = f"[{log_icon}HS] {host}:{port}"
             if has_record:
                 LOGGER.debug(msg)
             else:
@@ -180,7 +194,7 @@ async def handle_https(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{'🚀' if use_proxy else '✅'}HSErr2] {e} {host}:{port}")
+        LOGGER.warning(f"[{log_icon}HSErr2] {e} {host}:{port}")
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)

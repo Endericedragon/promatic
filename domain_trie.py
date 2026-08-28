@@ -20,8 +20,10 @@ class NodeStatus(Enum):
                 return "❔"
             case 1:
                 return "✅"
-            case 2 | 3:
+            case 2:
                 return "🚀"
+            case 3:
+                return "🔒"
 
 
 class TrieNode:
@@ -60,7 +62,9 @@ class DomainTrie:
         self.path_blacklist = Path("blacklist.txt")
 
     def insert(self, domain: str, status: NodeStatus):
-        """倒序插入域名，例如 a.google.com -> 插入路径: com -> google -> a"""
+        """倒序插入域名，例如 a.google.com -> 插入路径: com -> google -> a。
+        注意：若 domain 已存在且状态为 FORCE_PROXY，则不更新任何信息。
+        """
 
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
@@ -84,15 +88,17 @@ class DomainTrie:
         node.status = status
         for nn in path_nodes:
             # 1. 删除旧状态
-            if old_status == NodeStatus.PROXY:  # todo
-                nn.count_proxy -= 1
-            elif old_status == NodeStatus.DIRECT:
+            if old_status == NodeStatus.DIRECT:
                 nn.count_direct -= 1
+            elif old_status != NodeStatus.BRANCH:
+                # 不是BRANCH，又排除了DIRECT，只能是代理或强制代理
+                nn.count_proxy -= 1
             # 2. 添加新状态
-            if status == NodeStatus.PROXY:
-                nn.count_proxy += 1
-            elif status == NodeStatus.DIRECT:
+            if status == NodeStatus.DIRECT:
                 nn.count_direct += 1
+            elif status != NodeStatus.BRANCH:
+                # 不是BRANCH，又排除了DIRECT，只能是代理或强制代理
+                nn.count_proxy += 1
 
     def search(self, domain: str) -> NodeStatus:
         """搜索域名，返回其匹配或聚合后的状态
@@ -152,12 +158,12 @@ class DomainTrie:
     def compress_and_collect(self):
         """遍历并聚合规则"""
 
-        direct_ok_suffixes: List[str] = list()
-        proxy_needed_suffixes: List[str] = list()
+        whitelist_suffixes: List[str] = list()
+        graylist_suffixes: List[str] = list()
         acc: int = 0
 
         def dfs(node: TrieNode, path: Deque[str]):
-            nonlocal direct_ok_suffixes, proxy_needed_suffixes, acc
+            nonlocal whitelist_suffixes, graylist_suffixes, acc
             # 0. 准备
             if node.count_direct + node.count_proxy == 0:
                 # 节点无效（自己是BRANCH，同时其下要么没子节点，要么也都是BRANCH）
@@ -168,11 +174,11 @@ class DomainTrie:
             if len(path) > 1:
                 # 1.1 可以聚合成直连规则吗？
                 if node.is_pure_direct:
-                    direct_ok_suffixes.append(cur_path)
+                    whitelist_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.DIRECT
                 # 1.2 可以聚合成代理规则吗？
                 if node.is_pure_proxy:
-                    proxy_needed_suffixes.append(cur_path)
+                    graylist_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.PROXY
                 # 1.3 报告聚合结果
                 if aggregated_as != NodeStatus.BRANCH:
@@ -182,9 +188,9 @@ class DomainTrie:
             # 2.1 节点自己是否对应某条规则？
             match node.status:
                 case NodeStatus.DIRECT:
-                    direct_ok_suffixes.append(cur_path)
+                    whitelist_suffixes.append(cur_path)
                 case NodeStatus.PROXY:
-                    proxy_needed_suffixes.append(cur_path)
+                    graylist_suffixes.append(cur_path)
             # 2.2 递归子节点
             for txt, each in node.children.items():
                 path.appendleft(txt)
@@ -193,7 +199,7 @@ class DomainTrie:
 
         dfs(self.root, deque())
         LOGGER.info(f"[DomainTrie]聚合了{acc}条规则!")
-        return direct_ok_suffixes, proxy_needed_suffixes
+        return whitelist_suffixes, graylist_suffixes
 
     def __save_memo(self):
         """存储 Trie 规则到硬盘"""
@@ -215,9 +221,7 @@ class DomainTrie:
         backup_wlist = self.path_whitelist.rename(
             self.path_whitelist.with_suffix(".bak")
         )
-        backup_blist = self.path_graylist.rename(
-            self.path_graylist.with_suffix(".bak")
-        )
+        backup_blist = self.path_graylist.rename(self.path_graylist.with_suffix(".bak"))
         try:
             self.__save_memo()
         except:
@@ -243,6 +247,8 @@ class DomainTrie:
 
         mark_as(self.path_whitelist, NodeStatus.DIRECT)
         mark_as(self.path_graylist, NodeStatus.PROXY)
+        # 3. 加载强制代理规则
+        mark_as(self.path_blacklist, NodeStatus.FORCE_PROXY)
         self.is_dirty = False
 
 

@@ -24,6 +24,8 @@ asmrjp.org
 asmroger.com
 asmrpleasure.com
 bing.com
+bing.net
+bingapis.com
 bkcdn.net
 blacklist.tampermonkey.net
 blogger.com
@@ -44,6 +46,7 @@ claude.com
 cloudflare.com
 cloudflarestorage.com
 cloudfunctions.net
+cloudmessaging.edge.microsoft.com
 com.hk
 copilot.microsoft.com
 coveralls.io
@@ -86,6 +89,7 @@ g2fame.com
 gammaentertainment.com
 gemini.gstatic.com
 ggpht.com
+gitcode.net
 github.com
 github.githubassets.com
 githubusercontent.com
@@ -126,6 +130,7 @@ kemono.su
 kusart.com
 kxcdn.com
 lmarena.ai
+lmarena.com
 loveasmr.com
 medium.com
 morencius.com
@@ -138,6 +143,7 @@ onlyfans.com
 open.spotify.com
 openai.com
 ourdream.ai
+p.htwx.net
 p11-volcsearch-sign.byteimg.com
 pages.dev
 pbh-btn.com
