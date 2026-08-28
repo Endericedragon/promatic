@@ -18,7 +18,8 @@ LOGGER = get_logger()
 def default_tray_icon() -> Image.Image:
     """创建托盘上的图标。"""
 
-    image = Image.new("RGBA", (64, 64))
+    max_size: int = 64
+    image = Image.new("RGBA", (max_size, max_size))
     draw = ImageDraw.Draw(image)
     elli_radius: int = 24
     draw.ellipse(
@@ -28,7 +29,13 @@ def default_tray_icon() -> Image.Image:
         width=10,
     )
     rect_size: int = 24
-    draw.rectangle((64 - rect_size, 0, 64, rect_size), fill="white")
+    draw.rectangle(
+        (0, max_size - rect_size, max_size, rect_size),
+        fill="white",
+    )
+    draw.rectangle(
+        (max_size - rect_size, max_size - rect_size, max_size, max_size), fill="white"
+    )
     return image
 
 

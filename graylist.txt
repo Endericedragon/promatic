@@ -21,6 +21,7 @@ asmr.one
 asmrjp.org
 asmroger.com
 asmrpleasure.com
+auth.wikimedia.org
 bkcdn.net
 blacklist.tampermonkey.net
 blogger.com
@@ -39,12 +40,12 @@ civitai.red
 cloudflare.com
 cloudflarestorage.com
 cloudfunctions.net
-cloudmessaging.edge.microsoft.com
 com.hk
 copilot.microsoft.com
 coveralls.io
 d3oia8etllorh5.cloudfront.net
 danbooru.donmai.us
+darkreader.org
 deepseek404.com
 detectportal.firefox.com
 developerprofiles-pa.googleapis.com
@@ -188,9 +189,12 @@ trendshift.io
 twimg.com
 twitch.tv
 twitter.com
+ublockorigin.github.io
 uns.wtf
+upload.wikimedia.org
 valid-bottom.com
 views.scientific-python.org
+wikipedia.org
 withgoogle.com
 www.amd.com
 x.ai

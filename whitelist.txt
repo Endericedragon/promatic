@@ -94,7 +94,6 @@ cuckcapital.cr
 d.delivery.consentmanager.net
 d3a3ewgd1iewwz.cloudfront.net
 darkreader.app
-darkreader.org
 data.bilibili.com
 data.microsoft.com
 datav.run
@@ -110,7 +109,6 @@ dredgedemplacesurg.cfd
 dsh.so
 e297dffd4455.w.hcaptcha.com
 e6dfd6595821.w.hcaptcha.com
-edge.microsoft.com
 edu.cn
 educity.cn
 eisys-bcs.jp

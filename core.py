@@ -47,7 +47,7 @@ async def handle_conn_unified(
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
-            LOGGER.warning(f"[{log_icon}Err0] {type(e).__name__} {host}:{port}")
+            LOGGER.warning(f"[{log_icon}Err-TryDirect] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.PROXY)
             log_icon = repr(NodeStatus.PROXY) + "S" if is_https else "H"
             use_proxy = True
@@ -59,7 +59,7 @@ async def handle_conn_unified(
                 timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
-            LOGGER.error(f"[{log_icon}Err1] {type(e).__name__} {host}:{port}")
+            LOGGER.error(f"[{log_icon}Err-TryProxy] {type(e).__name__} {host}:{port}")
             TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return
         if is_https:
@@ -74,7 +74,7 @@ async def handle_conn_unified(
                 if not result or b"200" not in result:
                     raise Exception()  # 2.2.1 强制跳转到except
             except Exception as e:
-                LOGGER.error(f"[{log_icon}Err2] {type(e).__name__} {host}:{port}")
+                LOGGER.error(f"[{log_icon}Err-TryHTTPSConn] {type(e).__name__} {host}:{port}")
                 TRIE.insert(
                     host, NodeStatus.BRANCH
                 )  # 走直连和代理都不行，标记为分支节点
@@ -111,7 +111,7 @@ async def handle_conn_unified(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{log_icon}Err3] {e} {host}:{port}")
+        LOGGER.warning(f"[{log_icon}Err-TryTransfer] {e} {host}:{port}")
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
             TRIE.insert(host, NodeStatus.PROXY)
