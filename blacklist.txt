@@ -8,3 +8,4 @@ anthropic.com
 bing.com
 bing.net
 bingapis.com
+codeberg.org
