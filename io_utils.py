@@ -1,7 +1,7 @@
 import asyncio as aio
 from typing import Callable, Dict
 
-from consts import MAX_DIRECT_TIMEOUT, MAX_PROXY_TIMEOUT
+from consts import MAX_DIRECT_TIMEOUT, MAX_PROXY_TIMEOUT, BUFFER_SIZE
 from log_utils import get_logger
 
 LOGGER = get_logger()
@@ -94,14 +94,14 @@ async def pipe(
             if is_in_remote and recv_byte == 0:
                 # 首包通信，设置超时
                 data = await aio.wait_for(
-                    p_in.read(8192),
+                    p_in.read(BUFFER_SIZE),
                     timeout=(
                         MAX_PROXY_TIMEOUT if read_through_proxy else MAX_DIRECT_TIMEOUT
                     ),
                 )
             else:
                 # 说明首包通信已成功，不再设置超时
-                data = await p_in.read(8192)
+                data = await p_in.read(BUFFER_SIZE)
             if not data:
                 break
             if on_recv_first_data and recv_byte == 0:

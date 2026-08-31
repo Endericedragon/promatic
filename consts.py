@@ -11,6 +11,7 @@ MAX_DIRECT_TIMEOUT: float = 2.0  # 直连超时时间
 MAX_PROXY_TIMEOUT: float = 8.0  # 代理超时时间
 MAX_RETRY: int = 3  # 最大重试次数
 
+BUFFER_SIZE: int = 1024 * 64  # 64KB
 
 """代理设置"""
 PORT: int = 33333

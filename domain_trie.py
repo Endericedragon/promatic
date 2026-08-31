@@ -40,6 +40,14 @@ class TrieNode:
         count_force_proxy: 节点及其子节点中，强制代理节点的数量
     """
 
+    __slots__ = (
+        "children",
+        "status",
+        "count_proxy",
+        "count_direct",
+        "count_force_proxy",
+    )
+
     def __init__(self, nstat: NodeStatus):
         self.children: Dict[str, "TrieNode"] = dict()
         self.status = nstat
