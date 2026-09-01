@@ -9,3 +9,5 @@ bing.com
 bing.net
 bingapis.com
 codeberg.org
+b.ai
+cpu-monkey.com
