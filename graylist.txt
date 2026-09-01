@@ -6,7 +6,6 @@ akusta-archery.com
 alibow.cn
 asmr.one
 asmroger.com
-b.ai
 bicaster.com
 bkcdn.net
 blerp.com
@@ -42,6 +41,7 @@ googleadservices.com
 googleusercontent.com
 googlevideo.com
 greasyfork.org
+hanime1.me
 hengam.io
 hugecore.net
 iamcdn.net
