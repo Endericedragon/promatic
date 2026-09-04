@@ -71,7 +71,7 @@ class DomainTrie:
         self.root: TrieNode = TrieNode(NodeStatus.BRANCH)
         self.is_dirty: bool = False
         self.path_whitelist = Path("whitelist.txt")
-        self.path_graylist = Path("graylist.txt")
+        self.path_greylist = Path("greylist.txt")
         self.path_blacklist = Path("blacklist.txt")
 
     def insert(self, domain: str, status: NodeStatus):
@@ -150,11 +150,11 @@ class DomainTrie:
         """遍历并聚合规则"""
 
         whitelist_suffixes: List[str] = list()
-        graylist_suffixes: List[str] = list()
+        greylist_suffixes: List[str] = list()
         acc: int = 0
 
         def dfs(node: TrieNode, path: Deque[str]):
-            nonlocal whitelist_suffixes, graylist_suffixes, acc
+            nonlocal whitelist_suffixes, greylist_suffixes, acc
             # 0. 准备
             if node.count_direct + node.count_proxy + node.count_force_proxy == 0:
                 # 节点无效（自己是BRANCH，同时其下要么没子节点，要么也都是BRANCH）
@@ -169,7 +169,7 @@ class DomainTrie:
                     aggregated_as = NodeStatus.DIRECT
                 # 1.2 可以聚合成代理规则吗？
                 if node.is_pure_proxy:
-                    graylist_suffixes.append(cur_path)
+                    greylist_suffixes.append(cur_path)
                     aggregated_as = NodeStatus.PROXY
                 # 1.3 报告聚合结果
                 if aggregated_as != NodeStatus.BRANCH:
@@ -181,7 +181,7 @@ class DomainTrie:
                 case NodeStatus.DIRECT:
                     whitelist_suffixes.append(cur_path)
                 case NodeStatus.PROXY:
-                    graylist_suffixes.append(cur_path)
+                    greylist_suffixes.append(cur_path)
             # 2.2 递归子节点
             for txt, each in node.children.items():
                 path.appendleft(txt)
@@ -190,7 +190,7 @@ class DomainTrie:
 
         dfs(self.root, deque())
         LOGGER.info(f"[DomainTrie]聚合了{acc}条规则!")
-        return whitelist_suffixes, graylist_suffixes
+        return whitelist_suffixes, greylist_suffixes
 
     def __save_memo(self):
         """存储 Trie 规则到硬盘"""
@@ -199,7 +199,7 @@ class DomainTrie:
         with open(self.path_whitelist, "w", encoding="utf-8") as f:
             for each in sorted(whitelist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
-        with open(self.path_graylist, "w", encoding="utf-8") as f:
+        with open(self.path_greylist, "w", encoding="utf-8") as f:
             for each in sorted(blacklist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
         self.is_dirty = False
@@ -212,13 +212,13 @@ class DomainTrie:
         backup_wlist = self.path_whitelist.rename(
             self.path_whitelist.with_suffix(".bak")
         )
-        backup_blist = self.path_graylist.rename(self.path_graylist.with_suffix(".bak"))
+        backup_blist = self.path_greylist.rename(self.path_greylist.with_suffix(".bak"))
         try:
             self.__save_memo()
         except:
             # 2. 恢复备份文件
             backup_wlist.rename(self.path_whitelist)
-            backup_blist.rename(self.path_graylist)
+            backup_blist.rename(self.path_greylist)
             return False
         # 3. 一切如常，删除备份文件
         backup_wlist.unlink()
@@ -237,7 +237,7 @@ class DomainTrie:
                 pp.touch()
 
         mark_as(self.path_whitelist, NodeStatus.DIRECT)
-        mark_as(self.path_graylist, NodeStatus.PROXY)
+        mark_as(self.path_greylist, NodeStatus.PROXY)
         # 3. 加载强制代理规则
         mark_as(self.path_blacklist, NodeStatus.FORCE_PROXY)
         self.is_dirty = False
