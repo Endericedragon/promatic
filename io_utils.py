@@ -1,14 +1,22 @@
 import asyncio as aio
 from typing import Callable, Dict
 
-from consts import MAX_DIRECT_TIMEOUT, MAX_PROXY_TIMEOUT, BUFFER_SIZE
+from consts import (
+    BUFFER_SIZE,
+    CONN_PROXY_TEMPLATE,
+    MAX_DIRECT_TIMEOUT,
+    MAX_PROXY_TIMEOUT,
+    get_backend_port,
+)
+from errors import (
+    FakeDirectError,
+    DirectHandshakeError,
+    ProxyHandshakeError,
+    ProxyHandshakeError,
+)
 from log_utils import get_logger
 
 LOGGER = get_logger()
-
-
-class FakeDirectError(Exception):
-    pass
 
 
 async def safe_close(writer: aio.StreamWriter):
@@ -190,3 +198,51 @@ async def bidirectional_pipe(
     remote_recvd_bytes = task2.result() if not task2.exception() else 0
     if client_sent_bytes > 0 and remote_recvd_bytes == 0:
         raise FakeDirectError("Remote sent nothing")
+
+
+class Proto:
+    def __init__(self) -> None:
+        self.remote_reader: aio.StreamReader | None = None
+        self.remote_writer: aio.StreamWriter | None = None
+
+    async def try_connect(self, host: str, port: int, timeout: float):
+        self.remote_reader, self.remote_writer = await aio.wait_for(
+            aio.open_connection(host, port), timeout=timeout
+        )
+
+    async def handshake_directly(self, host: str, port: int):
+        try:
+            await self.try_connect(host, port, MAX_DIRECT_TIMEOUT)
+        except (aio.TimeoutError, OSError) as e:
+            raise DirectHandshakeError()
+
+    async def handshake_through_proxy(self, host: str, port: int):
+        try:
+            await self.try_connect("127.0.0.1", get_backend_port(), MAX_PROXY_TIMEOUT)
+        except (aio.TimeoutError, OSError) as e:
+            raise ProxyHandshakeError()
+
+    async def prepare_communication(self):
+        pass
+
+    async def net_io(self):
+        pass
+
+
+class HttpsProto(Proto):
+    async def handshake_through_proxy(self, host: str, port: int):
+        await super().handshake_through_proxy(host, port)
+        # 若是HTTPS请求，则还需要和远端发送CONNECT请求
+        PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
+        try:
+            assert self.remote_writer is not None and self.remote_reader is not None
+            self.remote_writer.write(PROXY_REQUEST.encode("latin1"))
+            await self.remote_writer.drain()
+            result = await read_headers(self.remote_reader)
+            if not result or b"200" not in result:
+                raise ProxyHandshakeError()
+        except Exception as e:
+            raise ProxyHandshakeError()
+
+    async def prepare_communication(self):
+        return await super().prepare_communication()
