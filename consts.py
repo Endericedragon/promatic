@@ -1,8 +1,8 @@
 # HTTPS时使用。HTTPS中，只有当服务器返回200 Connection Established时，
 # 客户端才认为连接成功，通信才能继续。
-from domain_trie import DomainTrie
+from trie import ClassificationForest
 
-CONN_ESABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
+CONN_ESTABLISHED: str = "HTTP/1.1 200 Connection Established\r\n\r\n"
 # HTTPS时使用。用于构建CONNECT请求，
 # 发往目标服务器（远端或本地代理服务器）请求构建连接。
 CONN_PROXY_TEMPLATE: str = "CONNECT {0}:{1} HTTP/1.1\r\nHost: {0}:{1}\r\n\r\n"
@@ -16,7 +16,7 @@ BUFFER_SIZE: int = 1024 * 64  # 64KB
 """代理设置"""
 PORT: int = 33333
 BACKEND_PROXY_PORT: int = 32001
-TRIE: DomainTrie = DomainTrie()
+FOREST: ClassificationForest = ClassificationForest()
 
 
 def get_port() -> int:

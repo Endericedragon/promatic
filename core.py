@@ -2,15 +2,15 @@ import asyncio as aio
 from urllib.parse import urlparse
 
 from consts import (
-    CONN_ESABLISHED,
+    CONN_ESTABLISHED,
     CONN_PROXY_TEMPLATE,
     MAX_DIRECT_TIMEOUT,
     MAX_PROXY_TIMEOUT,
-    TRIE,
+    FOREST,
     get_backend_port,
     get_port,
 )
-from domain_trie import NodeStatus
+from trie import NodeStatus
 from io_utils import bidirectional_pipe, read_headers, safe_close
 from log_utils import get_logger
 
@@ -29,10 +29,10 @@ async def handle_conn_unified(
     若port为None，则自动使用80端口。"""
     is_https = header_bytes is None
     port = port or (443 if is_https else 80)
-    trie_search_result = TRIE.search(host)
-    log_icon = repr(trie_search_result) + ("S" if is_https else "H")  # 用于日志图标
-    use_proxy = trie_search_result in {NodeStatus.PROXY, NodeStatus.FORCE_PROXY}
-    has_record = trie_search_result != NodeStatus.BRANCH
+    forest_search_result = FOREST.search(host)
+    log_icon = repr(forest_search_result) + ("S" if is_https else "H")  # 用于日志图标
+    use_proxy = forest_search_result == NodeStatus.PROXY
+    has_record = forest_search_result != NodeStatus.BRANCH
 
     # 1. 先尝试直连服务器
     if not use_proxy:
@@ -46,7 +46,7 @@ async def handle_conn_unified(
             LOGGER.warning(
                 f"[{log_icon}Err-TryDirect] {type(e).__name__} {host}:{port}"
             )
-            TRIE.insert(host, NodeStatus.PROXY)
+            FOREST.insert(host, NodeStatus.PROXY)
             log_icon = repr(NodeStatus.PROXY) + ("S" if is_https else "H")
             use_proxy = True
     # 2. 若直连失败或命中代理规则
@@ -58,7 +58,7 @@ async def handle_conn_unified(
             )
         except Exception as e:
             LOGGER.error(f"[{log_icon}Err-TryProxy] {type(e).__name__} {host}:{port}")
-            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
+            FOREST.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return
         if is_https:
             # 2.1 若是HTTPS请求，则还需要和远端发送CONNECT请求
@@ -75,7 +75,7 @@ async def handle_conn_unified(
                 LOGGER.error(
                     f"[{log_icon}Err-TryHTTPSConn] {type(e).__name__} {host}:{port}"
                 )
-                TRIE.insert(
+                FOREST.insert(
                     host, NodeStatus.BRANCH
                 )  # 走直连和代理都不行，标记为分支节点
                 await safe_close(target_writer)
@@ -84,7 +84,7 @@ async def handle_conn_unified(
     try:
         # 3.1 若是HTTPS，则告诉用户，代理连接已建立
         if is_https:
-            writer.write(CONN_ESABLISHED.encode("latin1"))
+            writer.write(CONN_ESTABLISHED.encode("latin1"))
             await writer.drain()
         # 3.1 否则，向远端转发请求头即可
         else:
@@ -94,7 +94,7 @@ async def handle_conn_unified(
 
         # 3.2 然后让用户和目标直接双向通信
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
-            global LOGGER, TRIE
+            global LOGGER, FOREST
             nonlocal use_proxy
             msg = f"[{log_icon}] {host}:{port}"
             if has_record:
@@ -103,7 +103,7 @@ async def handle_conn_unified(
                 LOGGER.info(msg)
             if not use_proxy:
                 # 首包通信成功，才能放心将其标记为直连
-                TRIE.insert(host, NodeStatus.DIRECT)
+                FOREST.insert(host, NodeStatus.DIRECT)
 
         await bidirectional_pipe(
             reader,
@@ -118,9 +118,9 @@ async def handle_conn_unified(
         LOGGER.warning(f"[{log_icon}Err-TryTransfer] {e} {host}:{port}")
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
-            TRIE.insert(host, NodeStatus.PROXY)
+            FOREST.insert(host, NodeStatus.PROXY)
         else:
-            TRIE.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
+            FOREST.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
     finally:
         await safe_close(target_writer)
 
@@ -165,7 +165,7 @@ async def autosave_trie(interval_sec: int = 60):
     while True:
         try:
             await aio.sleep(interval_sec)
-            if TRIE.safely_save_memo():
+            if FOREST.safely_save_memo():
                 LOGGER.debug("[AutoSave] Rules saved successfully.")
         except aio.CancelledError:
             break
@@ -177,7 +177,6 @@ async def main_logic(stop_event: aio.Event):
     """代理服务器的主逻辑。
     负责规则的加载和持久化，启动和停止代理服务器。
     """
-    TRIE.load_memo()
     save_task = aio.create_task(autosave_trie())
     proxy_server = await aio.start_server(start_proxy_server, "127.0.0.1", get_port())
     LOGGER.info("Proxy server started on 127.0.0.1:{}".format(get_port()))
@@ -191,10 +190,10 @@ async def main_logic(stop_event: aio.Event):
         current_task = aio.current_task()
         # 2. 取消所有其他任务
         save_task.cancel()
-        active_tasks = filter(lambda t: t is not current_task, aio.all_tasks())
+        active_tasks = list(filter(lambda t: t is not current_task, aio.all_tasks()))
         for each in active_tasks:
             each.cancel()
         if active_tasks:
             await aio.gather(*active_tasks, return_exceptions=True)
         # 3. 存储规则
-        TRIE.safely_save_memo()  # 持久化
+        FOREST.safely_save_memo()  # 持久化

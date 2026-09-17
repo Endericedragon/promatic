@@ -1,14 +1,22 @@
 import asyncio as aio
 from typing import Callable, Dict
 
-from consts import MAX_DIRECT_TIMEOUT, MAX_PROXY_TIMEOUT, BUFFER_SIZE
+from consts import (
+    BUFFER_SIZE,
+    CONN_PROXY_TEMPLATE,
+    MAX_DIRECT_TIMEOUT,
+    MAX_PROXY_TIMEOUT,
+    get_backend_port,
+)
+from errors import (
+    FakeDirectError,
+    DirectHandshakeError,
+    ProxyHandshakeError,
+    ProxyHandshakeError,
+)
 from log_utils import get_logger
 
 LOGGER = get_logger()
-
-
-class FakeDirectError(Exception):
-    pass
 
 
 async def safe_close(writer: aio.StreamWriter):
@@ -190,3 +198,17 @@ async def bidirectional_pipe(
     remote_recvd_bytes = task2.result() if not task2.exception() else 0
     if client_sent_bytes > 0 and remote_recvd_bytes == 0:
         raise FakeDirectError("Remote sent nothing")
+
+
+class Proto:
+    """策略基类，规定在隧道建立、和通信开始前的一系列动作。"""
+
+    def __init__(self, port: int, symbol: str) -> None:
+        self.port: int = port
+        self.log_symbol: str = symbol
+
+    async def setup_tunnel(self):
+        pass
+
+    async def prepare_communication(self):
+        pass
