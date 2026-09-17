@@ -2,7 +2,7 @@ import asyncio as aio
 from urllib.parse import urlparse
 
 from consts import (
-    CONN_ESABLISHED,
+    CONN_ESTABLISHED,
     CONN_PROXY_TEMPLATE,
     MAX_DIRECT_TIMEOUT,
     MAX_PROXY_TIMEOUT,
@@ -84,7 +84,7 @@ async def handle_conn_unified(
     try:
         # 3.1 若是HTTPS，则告诉用户，代理连接已建立
         if is_https:
-            writer.write(CONN_ESABLISHED.encode("latin1"))
+            writer.write(CONN_ESTABLISHED.encode("latin1"))
             await writer.drain()
         # 3.1 否则，向远端转发请求头即可
         else:
@@ -191,7 +191,7 @@ async def main_logic(stop_event: aio.Event):
         current_task = aio.current_task()
         # 2. 取消所有其他任务
         save_task.cancel()
-        active_tasks = filter(lambda t: t is not current_task, aio.all_tasks())
+        active_tasks = list(filter(lambda t: t is not current_task, aio.all_tasks()))
         for each in active_tasks:
             each.cancel()
         if active_tasks:

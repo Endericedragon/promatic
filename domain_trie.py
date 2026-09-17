@@ -63,7 +63,7 @@ class TrieNode:
     @property
     def is_pure_direct(self) -> bool:
         """判断该节点及其子节点是否全为直连节点"""
-        return self.count_direct > 0 and self.count_proxy + self.count_force_proxy > 0
+        return self.count_direct > 0 and self.count_proxy + self.count_force_proxy == 0
 
 
 class DomainTrie:
@@ -144,8 +144,6 @@ class DomainTrie:
         # 3. 实在没辙
         return last_matched_status
 
-        dfs(self.root, deque())
-
     def compress_and_collect(self):
         """遍历并聚合规则"""
 
@@ -195,12 +193,12 @@ class DomainTrie:
     def __save_memo(self):
         """存储 Trie 规则到硬盘"""
 
-        whitelist, blacklist = self.compress_and_collect()
+        whitelist, greylist = self.compress_and_collect()
         with open(self.path_whitelist, "w", encoding="utf-8") as f:
             for each in sorted(whitelist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
         with open(self.path_greylist, "w", encoding="utf-8") as f:
-            for each in sorted(blacklist, key=lambda x: (x, -len(x))):
+            for each in sorted(greylist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
         self.is_dirty = False
 
