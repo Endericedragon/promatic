@@ -201,48 +201,14 @@ async def bidirectional_pipe(
 
 
 class Proto:
-    def __init__(self) -> None:
-        self.remote_reader: aio.StreamReader | None = None
-        self.remote_writer: aio.StreamWriter | None = None
+    """策略基类，规定在隧道建立、和通信开始前的一系列动作。"""
 
-    async def try_connect(self, host: str, port: int, timeout: float):
-        self.remote_reader, self.remote_writer = await aio.wait_for(
-            aio.open_connection(host, port), timeout=timeout
-        )
+    def __init__(self, port: int, symbol: str) -> None:
+        self.port: int = port
+        self.log_symbol: str = symbol
 
-    async def handshake_directly(self, host: str, port: int):
-        try:
-            await self.try_connect(host, port, MAX_DIRECT_TIMEOUT)
-        except (aio.TimeoutError, OSError) as e:
-            raise DirectHandshakeError()
-
-    async def handshake_through_proxy(self, host: str, port: int):
-        try:
-            await self.try_connect("127.0.0.1", get_backend_port(), MAX_PROXY_TIMEOUT)
-        except (aio.TimeoutError, OSError) as e:
-            raise ProxyHandshakeError()
+    async def setup_tunnel(self):
+        pass
 
     async def prepare_communication(self):
         pass
-
-    async def net_io(self):
-        pass
-
-
-class HttpsProto(Proto):
-    async def handshake_through_proxy(self, host: str, port: int):
-        await super().handshake_through_proxy(host, port)
-        # 若是HTTPS请求，则还需要和远端发送CONNECT请求
-        PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
-        try:
-            assert self.remote_writer is not None and self.remote_reader is not None
-            self.remote_writer.write(PROXY_REQUEST.encode("latin1"))
-            await self.remote_writer.drain()
-            result = await read_headers(self.remote_reader)
-            if not result or b"200" not in result:
-                raise ProxyHandshakeError()
-        except Exception as e:
-            raise ProxyHandshakeError()
-
-    async def prepare_communication(self):
-        return await super().prepare_communication()

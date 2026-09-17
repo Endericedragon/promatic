@@ -94,7 +94,7 @@ async def handle_conn_unified(
 
         # 3.2 然后让用户和目标直接双向通信
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
-            global LOGGER, TRIE
+            global LOGGER, FOREST
             nonlocal use_proxy
             msg = f"[{log_icon}] {host}:{port}"
             if has_record:

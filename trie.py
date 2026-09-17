@@ -1,4 +1,3 @@
-from sre_constants import BRANCH
 import unittest
 from collections import deque
 from enum import Enum
@@ -75,19 +74,22 @@ class TrieNode:
                 return
             cur_path = ".".join(path)
             #  可以聚合吗？
-            match node.status:
-                case NodeStatus.DIRECT:
+            if len(path) >= 2:  # 只有二级域名以上才考虑聚合
+                if node.status == NodeStatus.DIRECT or node.is_pure_direct:
                     whitelist_suffixes.append(cur_path)
                     acc += 1
-                case NodeStatus.PROXY:
+                    if node.status == NodeStatus.DIRECT:  # 只有纯净才能免除递归，下同
+                        return
+                if node.status == NodeStatus.PROXY or node.is_pure_proxy:
                     greylist_suffixes.append(cur_path)
                     acc += 1
-                case _:
-                    # 2.2 递归子节点
-                    for txt, each in node.children.items():
-                        path.appendleft(txt)
-                        dfs(each, path)
-                        path.popleft()
+                    if node.status == NodeStatus.PROXY:
+                        return
+            # 递归子节点
+            for txt, each in node.children.items():
+                path.appendleft(txt)
+                dfs(each, path)
+                path.popleft()
 
         dfs(self, deque())
         LOGGER.info(f"[DomainTrie]聚合了{acc}条规则!")
@@ -104,6 +106,9 @@ class DomainTrie:
 
     def load_and_tag(self, rule_path: Path, ns: NodeStatus):
         """加载规则文件，将域名标记为指定状态"""
+        if not rule_path.exists():
+            rule_path.parent.mkdir(parents=True, exist_ok=True)
+            rule_path.touch(exist_ok=True)
         with open(rule_path, "r", encoding="utf-8") as f:
             while line := f.readline():
                 line = line.strip()
@@ -146,13 +151,6 @@ class DomainTrie:
                 nn.count_direct += 1
             elif status == NodeStatus.PROXY:
                 nn.count_proxy += 1
-            # 3. 及时更新自身状态
-            if nn.is_pure_direct:
-                nn.status = NodeStatus.DIRECT
-            elif nn.is_pure_proxy:
-                nn.status = NodeStatus.PROXY
-            else:
-                nn.status = NodeStatus.BRANCH
 
     def search(self, domain: str) -> NodeStatus:
         """搜索域名，返回其匹配或聚合后的状态
@@ -166,10 +164,11 @@ class DomainTrie:
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
         last_matched_status: NodeStatus = NodeStatus.BRANCH  # 最长匹配到的非BRANCH规则
-        for part in parts:
+        for idx, part in enumerate(parts):
             if part not in node.children:
                 # Trie 中仅存在domain的后缀，无法继续深入匹配
-                return NodeStatus.BRANCH
+                # 这里是一个启发式的判断，如果只有最后2截是一样的（例如都以com.cn结尾），则返回BRANCH
+                return NodeStatus.BRANCH if idx < 2 else last_matched_status
             node = node.children[part]
             if node.status != NodeStatus.BRANCH:
                 last_matched_status = node.status
