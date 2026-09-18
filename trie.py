@@ -78,12 +78,12 @@ class TrieNode:
                 if node.status == NodeStatus.DIRECT or node.is_pure_direct:
                     whitelist_suffixes.append(cur_path)
                     acc += 1
-                    if node.status == NodeStatus.DIRECT:  # 只有纯净才能免除递归，下同
+                    if node.is_pure_direct:  # 只有纯净才能免除递归，下同
                         return
                 if node.status == NodeStatus.PROXY or node.is_pure_proxy:
                     greylist_suffixes.append(cur_path)
                     acc += 1
-                    if node.status == NodeStatus.PROXY:
+                    if node.is_pure_proxy:
                         return
             # 递归子节点
             for txt, each in node.children.items():
@@ -156,7 +156,7 @@ class DomainTrie:
         """搜索域名，返回其匹配或聚合后的状态
 
         - 若 domain 精确匹配已有记录，返回该记录的状态
-        - 若 domain 是 Trie 中某记录的子域名（Trie 记录是 domain 的后缀），继承匹配到的最近非BRANCH父规则（若有）
+        - 若 domain 是 Trie 中某记录的子域名且 domain 长度 > 1，继承匹配到的最近非BRANCH父规则（若有）
         - 若 domain 是 Trie 中多条记录的公共后缀，且这些子记录全为代理/直连时，聚合返回对应状态
         - 否则返回 BRANCH
         """
@@ -167,8 +167,9 @@ class DomainTrie:
         for idx, part in enumerate(parts):
             if part not in node.children:
                 # Trie 中仅存在domain的后缀，无法继续深入匹配
-                # 这里是一个启发式的判断，如果只有最后2截是一样的（例如都以com.cn结尾），则返回BRANCH
-                return NodeStatus.BRANCH if idx < 2 else last_matched_status
+                # 进入该分支，意味着有idx个部分能匹配上，例如idx=0时进入分支，表示压根不匹配任何trie中后缀
+                # 这里是一个启发式的判断，如果只有最后1截是一样的（例如都以.cn结尾），则返回BRANCH
+                return NodeStatus.BRANCH if idx <= 1 else last_matched_status
             node = node.children[part]
             if node.status != NodeStatus.BRANCH:
                 last_matched_status = node.status
@@ -186,26 +187,33 @@ class DomainTrie:
 
 class ClassificationForest:
     def __init__(self) -> None:
-        self.path_blacklist = Path("blacklist.txt")
-        self.path_whitelist = Path("whitelist.txt")
-        self.path_greylist = Path("greylist.txt")
+        self.path_forced_proxy = Path("forced_proxy.txt")
+        self.path_forced_direct = Path("forced_direct.txt")
 
-        self.force_proxy_trie = DomainTrie().load_and_tag(
-            self.path_blacklist, NodeStatus.PROXY
+        self.path_whitelist = Path("whitelist.txt")
+        self.path_blacklist = Path("blacklist.txt")
+
+        self.force_load_rules()
+
+    def force_load_rules(self):
+        self.forced_trie = (
+            DomainTrie()
+            .load_and_tag(self.path_forced_proxy, NodeStatus.PROXY)
+            .load_and_tag(self.path_forced_direct, NodeStatus.DIRECT)
         )
         self.detect_trie = (
             DomainTrie()
             .load_and_tag(self.path_whitelist, NodeStatus.DIRECT)
-            .load_and_tag(self.path_greylist, NodeStatus.PROXY)
+            .load_and_tag(self.path_blacklist, NodeStatus.PROXY)
         )
 
     def insert(self, domain: str, status: NodeStatus):
-        """探测到哦可直连/需代理的域名时，加入探测树"""
+        """探测到可直连/需代理的域名时，加入探测树"""
         return self.detect_trie.insert(domain, status)
 
     def search(self, domain: str) -> NodeStatus:
         """搜索域名，返回其匹配或聚合后的状态"""
-        res = self.force_proxy_trie.search(domain)
+        res = self.forced_trie.search(domain)
         if res != NodeStatus.BRANCH:
             return res
         return self.detect_trie.search(domain)
@@ -217,7 +225,7 @@ class ClassificationForest:
         with open(self.path_whitelist, "w", encoding="utf-8") as f:
             for each in sorted(whitelist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
-        with open(self.path_greylist, "w", encoding="utf-8") as f:
+        with open(self.path_blacklist, "w", encoding="utf-8") as f:
             for each in sorted(greylist, key=lambda x: (x, -len(x))):
                 print(each, file=f)
         self.detect_trie.is_dirty = False
@@ -230,13 +238,15 @@ class ClassificationForest:
         backup_wlist = self.path_whitelist.rename(
             self.path_whitelist.with_suffix(".bak")
         )
-        backup_blist = self.path_greylist.rename(self.path_greylist.with_suffix(".bak"))
+        backup_blist = self.path_blacklist.rename(
+            self.path_blacklist.with_suffix(".bak")
+        )
         try:
             self.__save_memo()
-        except:
+        except Exception:
             # 2. 恢复备份文件
             backup_wlist.rename(self.path_whitelist)
-            backup_blist.rename(self.path_greylist)
+            backup_blist.rename(self.path_blacklist)
             return False
         # 3. 一切如常，删除备份文件
         backup_wlist.unlink()
@@ -251,11 +261,13 @@ class TestForest(unittest.TestCase):
         forest.insert("b.x.y", NodeStatus.DIRECT)
         assert forest.search("x.y") == NodeStatus.DIRECT
 
-    def test_whitelist(self):
+    def test_rules(self):
         forest = ClassificationForest()
-        assert forest.search("163.com") == NodeStatus.DIRECT
-        assert forest.search("arena.ai") == NodeStatus.PROXY
-        assert forest.search("non-exists.dummy") == NodeStatus.BRANCH
+        self.assertEqual(forest.search("163.com"), NodeStatus.DIRECT)
+        self.assertEqual(forest.search("mail.163.com"), NodeStatus.DIRECT)
+        self.assertEqual(forest.search("arena.ai"), NodeStatus.PROXY)
+        self.assertEqual(forest.search("non-exists.com"), NodeStatus.BRANCH)
+        self.assertEqual(forest.search("api.bilibili.com"), NodeStatus.DIRECT)
 
 
 if __name__ == "__main__":

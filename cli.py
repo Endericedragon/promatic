@@ -6,7 +6,7 @@ import pystray
 from PIL import Image, ImageDraw
 from pystray._base import Icon as PIcon
 
-from consts import get_port
+from consts import get_port, FOREST
 from core import main_logic
 from io_utils import ignore_windows_socket_reset
 from log_utils import get_logger
@@ -56,6 +56,7 @@ def create_tray_utils(loop: aio.AbstractEventLoop, stop_event: aio.Event) -> PIc
     menu = pystray.Menu(
         pystray.MenuItem(f"Port: {get_port()}", lambda *_: None, enabled=False),
         pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Reload rules", lambda *_: FOREST.force_load_rules()),
         pystray.MenuItem("Exit", on_exit),
     )
 

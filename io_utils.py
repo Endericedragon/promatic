@@ -1,8 +1,10 @@
+from abc import abstractmethod
 import asyncio as aio
-from typing import Callable, Dict
+from typing import Callable, Dict, override
 
 from consts import (
     BUFFER_SIZE,
+    CONN_ESTABLISHED,
     CONN_PROXY_TEMPLATE,
     MAX_DIRECT_TIMEOUT,
     MAX_PROXY_TIMEOUT,
@@ -203,12 +205,65 @@ async def bidirectional_pipe(
 class Proto:
     """策略基类，规定在隧道建立、和通信开始前的一系列动作。"""
 
-    def __init__(self, port: int, symbol: str) -> None:
-        self.port: int = port
-        self.log_symbol: str = symbol
+    port: int
+    log_symbol: str
 
-    async def setup_tunnel(self):
+    @abstractmethod
+    async def setup_proxy_tunnel(
+        self, proxy_reader: aio.StreamReader, proxy_writer: aio.StreamWriter
+    ):
         pass
 
+    @abstractmethod
     async def prepare_communication(self):
         pass
+
+
+class HttpProto(Proto):
+    port = 80
+    log_symbol = "H"
+
+    @override
+    async def setup_proxy_tunnel(self, *_):
+        """HTTP请求，无需代理隧道"""
+        return True
+
+    @override
+    async def prepare_communication(
+        self, remote_writer: aio.StreamWriter, header_bytes: bytes
+    ):
+        """HTTP隧道建立，向远端转发HTTP请求头"""
+        remote_writer.write(header_bytes)
+        await remote_writer.drain()
+
+
+class HttpsProto(Proto):
+    port = 443
+    log_symbol = "S"
+
+    @override
+    async def setup_proxy_tunnel(
+        self,
+        proxy_reader: aio.StreamReader,
+        proxy_writer: aio.StreamWriter,
+        host: str,
+        port: int,
+    ) -> bool:
+        """HTTPS请求，需要和远端发送CONNECT请求"""
+        try:
+            # 2.1 构造代理请求
+            PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
+            proxy_writer.write(PROXY_REQUEST.encode("latin1"))
+            await proxy_writer.drain()
+            # 2.2 看看代理返回了啥，若包含200则成功
+            result = await read_headers(proxy_reader)
+            return bool(result) and (b"200" in result)
+        except Exception:  # 走直连和代理都不行，标记为分支节点
+            await safe_close(proxy_writer)
+            return False
+
+    @override
+    async def prepare_communication(self, client_writer: aio.StreamWriter):
+        """HTTPS隧道建立，向客户端回复CONN_ESTABLISHED"""
+        client_writer.write(CONN_ESTABLISHED.encode("latin1"))
+        await client_writer.drain()

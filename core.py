@@ -57,6 +57,7 @@ async def handle_conn_unified(
                 timeout=MAX_PROXY_TIMEOUT,
             )
         except Exception as e:
+            # todo 后端代理没开吧？？
             LOGGER.error(f"[{log_icon}Err-TryProxy] {type(e).__name__} {host}:{port}")
             FOREST.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
             return

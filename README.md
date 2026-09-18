@@ -11,6 +11,37 @@ uv run cli.py
 uv run gui.py
 ```
 
+## 核心函数讲解
+
+本项目的核心函数是 `handle_conn_unified` 。它可以同时承担客户端发来的HTTP和HTTPS代理请求，且面对两种请求的逻辑高度重叠。
+
+用流程图来描述，大概是这样：
+
+```mermaid
+graph TD
+
+A1[从客户端发来的headers获得目标host和port] --> J0
+J0{"host已被记录为代理？"} -->|否| A2
+J0 -->|是| A4
+A2["尝试open_connection(host, port)"] --> J1
+J1{"成功？"} -->|否| A3
+J1 -->|是| A20
+A3["记为代理"] --> A4
+A4["连接后端代理"] --> A5
+A5{"是否HTTPS？"}
+A5 --> |是| A6
+A5 --> |否| A20
+A6["发送CONNECT请求"] --> A7
+A7{"响应200？"} --> A20
+A20["记录target_reader和target_writer"] --> A21
+A21{"是否HTTPS？"}
+A21 --> |是| A21S
+A21 --> |否| A21H
+A21S["向客户端发送200 Connection Established"] --> A22
+A21H["向target_writer写入客户端发来的headers"] --> A22
+A22["后续通信"] 
+```
+
 ## 知识点
 
 ### HTTP和HTTPS代理的请求头
