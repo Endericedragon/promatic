@@ -41,7 +41,7 @@ async def handle_conn_unified(
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
             LOGGER.warning(
-                f"[{log_icon}Err-TryDirect] {type(e).__name__} {req.host}:{req.port}"
+                f"[{log_icon}ErrDirect] {type(e).__name__} {req.host}:{req.port}"
             )
             FOREST.insert(req.host, NodeStatus.PROXY)
             log_icon = repr(NodeStatus.PROXY)
@@ -56,14 +56,14 @@ async def handle_conn_unified(
         except Exception as e:
             # todo 后端代理没开吧？？
             LOGGER.error(
-                f"[{log_icon}Err-TryProxy] {type(e).__name__} {req.host}:{req.port}"
+                f"[{log_icon}ErrProxy] {type(e).__name__} {req.host}:{req.port}"
             )
             FOREST.insert(
                 req.host, NodeStatus.BRANCH
             )  # 走直连和代理都不行，标记为分支节点
             return
         if not await req.proto.setup_proxy_tunnel(target_reader, target_writer, req):
-            LOGGER.error(f"[{log_icon}Err-TryHTTPSConn] {req.host}:{req.port}")
+            LOGGER.error(f"[{log_icon}ErrHTTPSConn] {req.host}:{req.port}")
             FOREST.insert(
                 req.host, NodeStatus.BRANCH
             )  # 走直连和代理都不行，标记为分支节点

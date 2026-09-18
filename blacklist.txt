@@ -1,0 +1,11 @@
+civitai.com
+cloudfunctions.net
+com.hk
+encrypted-tbn2.gstatic.com
+ggpht.com
+google.com
+googleusercontent.com
+googlevideo.com
+nhentai.net
+youtube.com
+ytimg.com

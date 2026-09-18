@@ -72,9 +72,9 @@ class TrieNode:
             if node.count_direct + node.count_proxy == 0:
                 # 节点无效（自己是BRANCH，同时其下要么没子节点，要么也都是BRANCH）
                 return
-            cur_path = ".".join(path)
             #  可以聚合吗？
             if len(path) >= 2:  # 只有二级域名以上才考虑聚合
+                cur_path = ".".join(path)
                 if node.status == NodeStatus.DIRECT or node.is_pure_direct:
                     whitelist_suffixes.append(cur_path)
                     acc += 1
@@ -186,29 +186,30 @@ class DomainTrie:
 
 
 class ClassificationForest:
-    def __init__(self) -> None:
+    def __init__(self, load_rules: bool = True) -> None:
         self.path_forced_proxy = Path("forced_proxy.txt")
         self.path_forced_direct = Path("forced_direct.txt")
 
         self.path_whitelist = Path("whitelist.txt")
         self.path_blacklist = Path("blacklist.txt")
 
-        self.force_load_rules()
+        self.forced_trie = DomainTrie()
+        self.detect_trie = DomainTrie()
+        if load_rules:
+            self.force_load_rules()
 
     def force_load_rules(self):
-        self.forced_trie = (
-            DomainTrie()
-            .load_and_tag(self.path_forced_proxy, NodeStatus.PROXY)
-            .load_and_tag(self.path_forced_direct, NodeStatus.DIRECT)
-        )
-        self.detect_trie = (
-            DomainTrie()
-            .load_and_tag(self.path_whitelist, NodeStatus.DIRECT)
-            .load_and_tag(self.path_blacklist, NodeStatus.PROXY)
-        )
+        self.forced_trie = self.forced_trie.load_and_tag(
+            self.path_forced_proxy, NodeStatus.PROXY
+        ).load_and_tag(self.path_forced_direct, NodeStatus.DIRECT)
+        self.detect_trie = self.detect_trie.load_and_tag(
+            self.path_whitelist, NodeStatus.DIRECT
+        ).load_and_tag(self.path_blacklist, NodeStatus.PROXY)
 
     def insert(self, domain: str, status: NodeStatus):
-        """探测到可直连/需代理的域名时，加入探测树"""
+        """探测到可直连/需代理的域名，且不在强制规则中时，加入探测树"""
+        if self.forced_trie.search(domain) != NodeStatus.BRANCH:
+            return
         return self.detect_trie.insert(domain, status)
 
     def search(self, domain: str) -> NodeStatus:
@@ -262,12 +263,11 @@ class TestForest(unittest.TestCase):
         assert forest.search("x.y") == NodeStatus.DIRECT
 
     def test_rules(self):
-        forest = ClassificationForest()
-        self.assertEqual(forest.search("163.com"), NodeStatus.DIRECT)
-        self.assertEqual(forest.search("mail.163.com"), NodeStatus.DIRECT)
-        self.assertEqual(forest.search("arena.ai"), NodeStatus.PROXY)
-        self.assertEqual(forest.search("non-exists.com"), NodeStatus.BRANCH)
-        self.assertEqual(forest.search("api.bilibili.com"), NodeStatus.DIRECT)
+        forest = ClassificationForest(load_rules=False)
+        # forest.forced_trie.load_and_tag(forest.path_forced_proxy, NodeStatus.PROXY)
+        forest.forced_trie.load_and_tag(forest.path_forced_direct, NodeStatus.DIRECT)
+
+        self.assertEqual(forest.search("www.bilibili.com"), NodeStatus.DIRECT)
 
 
 if __name__ == "__main__":

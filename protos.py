@@ -27,7 +27,8 @@ class Proto(ABC):
         proxy_reader: aio.StreamReader,
         proxy_writer: aio.StreamWriter,
         req: ProxyRequest,
-    ): ...
+    ):
+        """设置代理隧道，返回是否成功。"""
 
     @abstractmethod
     async def prepare_communication(
@@ -35,7 +36,8 @@ class Proto(ABC):
         remote_writer: aio.StreamWriter,
         client_writer: aio.StreamWriter,
         req: ProxyRequest,
-    ): ...
+    ):
+        """准备通信，向远端转发请求头。"""
 
 
 class HttpProto(Proto):
