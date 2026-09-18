@@ -2,8 +2,6 @@ import asyncio as aio
 from urllib.parse import urlparse
 
 from consts import (
-    CONN_ESTABLISHED,
-    CONN_PROXY_TEMPLATE,
     MAX_DIRECT_TIMEOUT,
     MAX_PROXY_TIMEOUT,
     FOREST,
@@ -11,26 +9,25 @@ from consts import (
     get_port,
 )
 from trie import NodeStatus
-from io_utils import bidirectional_pipe, read_headers, safe_close
+from io_utils import (
+    bidirectional_pipe,
+    read_headers,
+    safe_close,
+)
+from protos import HTTP_INSTANCE, HTTPS_INSTANCE, ProxyRequest
 from log_utils import get_logger
 
 LOGGER = get_logger()
 
 
 async def handle_conn_unified(
-    reader: aio.StreamReader,
-    writer: aio.StreamWriter,
-    host: str,
-    port: int | None,
-    header_bytes: bytearray | None,
+    reader: aio.StreamReader, writer: aio.StreamWriter, req: ProxyRequest
 ):
     """统一处理HTTP和HTTPS连接。
     先尝试直连服务器，若超时则换成代理访问。
-    若port为None，则自动使用80端口。"""
-    is_https = header_bytes is None
-    port = port or (443 if is_https else 80)
-    forest_search_result = FOREST.search(host)
-    log_icon = repr(forest_search_result) + ("S" if is_https else "H")  # 用于日志图标
+    """
+    forest_search_result = FOREST.search(req.host)
+    log_icon = repr(forest_search_result)  # 用于日志图标
     use_proxy = forest_search_result == NodeStatus.PROXY
     has_record = forest_search_result != NodeStatus.BRANCH
 
@@ -38,16 +35,16 @@ async def handle_conn_unified(
     if not use_proxy:
         try:
             target_reader, target_writer = await aio.wait_for(
-                aio.open_connection(host, port), timeout=MAX_DIRECT_TIMEOUT
+                aio.open_connection(req.host, req.port), timeout=MAX_DIRECT_TIMEOUT
             )
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
             LOGGER.warning(
-                f"[{log_icon}Err-TryDirect] {type(e).__name__} {host}:{port}"
+                f"[{log_icon}Err-TryDirect] {type(e).__name__} {req.host}:{req.port}"
             )
-            FOREST.insert(host, NodeStatus.PROXY)
-            log_icon = repr(NodeStatus.PROXY) + ("S" if is_https else "H")
+            FOREST.insert(req.host, NodeStatus.PROXY)
+            log_icon = repr(NodeStatus.PROXY)
             use_proxy = True
     # 2. 若直连失败或命中代理规则
     if use_proxy:
@@ -58,53 +55,36 @@ async def handle_conn_unified(
             )
         except Exception as e:
             # todo 后端代理没开吧？？
-            LOGGER.error(f"[{log_icon}Err-TryProxy] {type(e).__name__} {host}:{port}")
-            FOREST.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
+            LOGGER.error(
+                f"[{log_icon}Err-TryProxy] {type(e).__name__} {req.host}:{req.port}"
+            )
+            FOREST.insert(
+                req.host, NodeStatus.BRANCH
+            )  # 走直连和代理都不行，标记为分支节点
             return
-        if is_https:
-            # 2.1 若是HTTPS请求，则还需要和远端发送CONNECT请求
-            try:
-                # 2.1 构造代理请求
-                PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(host, port)
-                target_writer.write(PROXY_REQUEST.encode("latin1"))
-                await target_writer.drain()
-                # 2.2 看看代理返回了啥，若包含200则成功
-                result = await read_headers(target_reader)
-                if not result or b"200" not in result:
-                    raise Exception()  # 2.2.1 强制跳转到except
-            except Exception as e:
-                LOGGER.error(
-                    f"[{log_icon}Err-TryHTTPSConn] {type(e).__name__} {host}:{port}"
-                )
-                FOREST.insert(
-                    host, NodeStatus.BRANCH
-                )  # 走直连和代理都不行，标记为分支节点
-                await safe_close(target_writer)
-                return
+        if not await req.proto.setup_proxy_tunnel(target_reader, target_writer, req):
+            LOGGER.error(f"[{log_icon}Err-TryHTTPSConn] {req.host}:{req.port}")
+            FOREST.insert(
+                req.host, NodeStatus.BRANCH
+            )  # 走直连和代理都不行，标记为分支节点
+            await safe_close(target_writer)
+            return
     # 3. 开始通信
     try:
-        # 3.1 若是HTTPS，则告诉用户，代理连接已建立
-        if is_https:
-            writer.write(CONN_ESTABLISHED.encode("latin1"))
-            await writer.drain()
-        # 3.1 否则，向远端转发请求头即可
-        else:
-            assert header_bytes is not None
-            target_writer.write(header_bytes)
-            await target_writer.drain()
+        await req.proto.prepare_communication(target_writer, writer, req)
 
         # 3.2 然后让用户和目标直接双向通信
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
             global LOGGER, FOREST
             nonlocal use_proxy
-            msg = f"[{log_icon}] {host}:{port}"
+            msg = f"[{log_icon}] {req.host}:{req.port}"
             if has_record:
                 LOGGER.debug(msg)
             else:
                 LOGGER.info(msg)
             if not use_proxy:
                 # 首包通信成功，才能放心将其标记为直连
-                FOREST.insert(host, NodeStatus.DIRECT)
+                FOREST.insert(req.host, NodeStatus.DIRECT)
 
         await bidirectional_pipe(
             reader,
@@ -116,12 +96,14 @@ async def handle_conn_unified(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{log_icon}Err-TryTransfer] {e} {host}:{port}")
+        LOGGER.warning(f"[{log_icon}Err-TryTransfer] {e} {req.host}:{req.port}")
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
-            FOREST.insert(host, NodeStatus.PROXY)
+            FOREST.insert(req.host, NodeStatus.PROXY)
         else:
-            FOREST.insert(host, NodeStatus.BRANCH)  # 走直连和代理都不行，标记为分支节点
+            FOREST.insert(
+                req.host, NodeStatus.BRANCH
+            )  # 走直连和代理都不行，标记为分支节点
     finally:
         await safe_close(target_writer)
 
@@ -148,14 +130,16 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
                 # HTTPS
                 host, port_str = path.split(":", 1)
                 port = int(port_str)
-                await handle_conn_unified(reader, writer, host, port, None)
+                proxy_req = ProxyRequest(HTTPS_INSTANCE, host, port, header_bytes)
+                await handle_conn_unified(reader, writer, proxy_req)
             case _:
                 # HTTP请求，如GET、POST等
                 parsed = urlparse(path)
-                assert parsed.hostname is not None
-                await handle_conn_unified(
-                    reader, writer, parsed.hostname, parsed.port, header_bytes
+                assert parsed.hostname is not None and parsed.port is not None
+                proxy_req = ProxyRequest(
+                    HTTP_INSTANCE, parsed.hostname, parsed.port, header_bytes
                 )
+                await handle_conn_unified(reader, writer, proxy_req)
     except Exception as e:
         LOGGER.error(f"[ServerErr] {type(e).__name__}: {e}")
     finally:
