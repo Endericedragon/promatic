@@ -11,7 +11,6 @@ from io_utils import read_headers, safe_close
 class ProxyRequest:
     proto: "Proto"
     host: str
-    port: int
     header_bytes: bytearray
 
 
@@ -80,7 +79,7 @@ class HttpsProto(Proto):
         """HTTPS请求，需要和远端发送CONNECT请求"""
         try:
             # 2.1 构造代理请求
-            PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(req.host, req.port)
+            PROXY_REQUEST = CONN_PROXY_TEMPLATE.format(req.host, req.proto.port)
             proxy_writer.write(PROXY_REQUEST.encode("latin1"))
             await proxy_writer.drain()
             # 2.2 看看代理返回了啥，若包含200则成功

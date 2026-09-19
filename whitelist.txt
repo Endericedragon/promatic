@@ -4,6 +4,7 @@
 166.10
 360buyimg.men
 4.adsco.re
+54kefu.net
 6.adsco.re
 adsco.re
 aibooru.download
@@ -12,6 +13,9 @@ api-iam.intercom.io
 azureedge.net
 bacchiccupule.qpon
 baomitu.com
+bcebos.com
+bdimg.com
+bdstatic.com
 bebangcaromel.com
 betteradsystem.com
 bmcx.com
@@ -27,7 +31,6 @@ byteimg.com
 bytescm.com
 bytetcc.com
 c.adsco.re
-cdn.donmai.us
 cherry-ai.com
 ci-en.jp
 civitai.red
@@ -43,6 +46,7 @@ crisp.chat
 darkreader.org
 doubleclick.net
 edge.microsoft.com
+edu.cn
 emule-security.org
 esdict.cn
 eudic.net
@@ -61,9 +65,9 @@ github.io
 gitlab.io
 googleapis.com
 googletagmanager.com
+graph.microsoft.com
 gstatic.cn
 gtimg.cn
-hdslb.com
 hgc.jp
 hitokoto.cn
 ibytedapm.com
@@ -100,6 +104,7 @@ qqvcouthy.qpon
 rankeralkenna.cyou
 rbtab.com
 recaptcha.net
+rewardsplatform.microsoft.com
 ribsiuds.qpon
 s.pximg.net
 s4.adsco.re
@@ -115,6 +120,7 @@ tencent.com
 triunepropus.qpon
 tsyndicate.com
 unpkg.com
+update.googleapis.com
 verblike.com
 visitsentry.com
 visualwebsiteoptimizer.com
@@ -123,6 +129,7 @@ vultr.com
 w.org
 website-files.com
 webtorrent.dev
+webxtsvc.microsoft.com
 weserv.nl
 widget.intercom.io
 workbuddy.cn

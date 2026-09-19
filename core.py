@@ -35,13 +35,14 @@ async def handle_conn_unified(
     if not use_proxy:
         try:
             target_reader, target_writer = await aio.wait_for(
-                aio.open_connection(req.host, req.port), timeout=MAX_DIRECT_TIMEOUT
+                aio.open_connection(req.host, req.proto.port),
+                timeout=MAX_DIRECT_TIMEOUT,
             )
             # 先不急着标记为直连，等首包通信成功后再标记
         except (aio.TimeoutError, OSError) as e:
             # 直连失败，记录日志并切换为代理
             LOGGER.warning(
-                f"[{log_icon}ErrDirect] {type(e).__name__} {req.host}:{req.port}"
+                f"[{log_icon}ErrDirect] {type(e).__name__} {req.host}:{req.proto.port}"
             )
             FOREST.insert(req.host, NodeStatus.PROXY)
             log_icon = repr(NodeStatus.PROXY)
@@ -56,14 +57,14 @@ async def handle_conn_unified(
         except Exception as e:
             # todo 后端代理没开吧？？
             LOGGER.error(
-                f"[{log_icon}ErrProxy] {type(e).__name__} {req.host}:{req.port}"
+                f"[{log_icon}ErrProxy] {type(e).__name__} {req.host}:{req.proto.port}"
             )
             FOREST.insert(
                 req.host, NodeStatus.BRANCH
             )  # 走直连和代理都不行，标记为分支节点
             return
         if not await req.proto.setup_proxy_tunnel(target_reader, target_writer, req):
-            LOGGER.error(f"[{log_icon}ErrHTTPSConn] {req.host}:{req.port}")
+            LOGGER.error(f"[{log_icon}ErrHTTPSConn] {req.host}:{req.proto.port}")
             FOREST.insert(
                 req.host, NodeStatus.BRANCH
             )  # 走直连和代理都不行，标记为分支节点
@@ -77,7 +78,7 @@ async def handle_conn_unified(
         def mark_as():  # 当返回首包时，可以准确标记域名为直连还是代理了
             global LOGGER, FOREST
             nonlocal use_proxy
-            msg = f"[{log_icon}] {req.host}:{req.port}"
+            msg = f"[{log_icon}] {req.host}:{req.proto.port}"
             if has_record:
                 LOGGER.debug(msg)
             else:
@@ -96,7 +97,7 @@ async def handle_conn_unified(
         )
         # 3.3 通信成功
     except Exception as e:  # 只会被FakeDirectError触发
-        LOGGER.warning(f"[{log_icon}Err-TryTransfer] {e} {req.host}:{req.port}")
+        LOGGER.warning(f"[{log_icon}Err-TryTransfer] {e} {req.host}:{req.proto.port}")
         if not use_proxy:
             # 3.4 如果命中直连规则但无法成功的，记为代理
             FOREST.insert(req.host, NodeStatus.PROXY)
@@ -130,15 +131,13 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
                 # HTTPS
                 host, port_str = path.split(":", 1)
                 port = int(port_str)
-                proxy_req = ProxyRequest(HTTPS_INSTANCE, host, port, header_bytes)
+                proxy_req = ProxyRequest(HTTPS_INSTANCE, host, header_bytes)
                 await handle_conn_unified(reader, writer, proxy_req)
             case _:
                 # HTTP请求，如GET、POST等
                 parsed = urlparse(path)
-                assert parsed.hostname is not None and parsed.port is not None
-                proxy_req = ProxyRequest(
-                    HTTP_INSTANCE, parsed.hostname, parsed.port, header_bytes
-                )
+                assert parsed.hostname is not None
+                proxy_req = ProxyRequest(HTTP_INSTANCE, parsed.hostname, header_bytes)
                 await handle_conn_unified(reader, writer, proxy_req)
     except Exception as e:
         LOGGER.error(f"[ServerErr] {type(e).__name__}: {e}")

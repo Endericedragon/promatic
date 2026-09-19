@@ -53,10 +53,14 @@ def create_tray_utils(loop: aio.AbstractEventLoop, stop_event: aio.Event) -> PIc
         loop.call_soon_threadsafe(stop_event.set)
         icon.stop()
 
+    def on_reload_rules(*_):
+        FOREST.force_load_rules()
+        print("Rules reloaded!")
+
     menu = pystray.Menu(
         pystray.MenuItem(f"Port: {get_port()}", lambda *_: None, enabled=False),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("Reload rules", lambda *_: FOREST.force_load_rules()),
+        pystray.MenuItem("Reload rules", on_reload_rules),
         pystray.MenuItem("Exit", on_exit),
     )
 

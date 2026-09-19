@@ -3,14 +3,17 @@ abyssplayer.com
 adexchangerapid.com
 aibooru.online
 ajax.googleapis.com
+alibow.cn
 anime-pictures.net
 asmr.one
 asmroger.com
 ay267.com
 bkcdn.net
 bleawwsm.com
+boomio-cdn.com
 botsinspect.com
 cangku.moe
+cdn.donmai.us
 chinamobile.com.prod.hosts.ooklaserver.net
 civitai.com
 cloudfront.net
@@ -19,6 +22,7 @@ cloudmessaging.edge.microsoft.com
 cn.prod.hosts.ooklaserver.net
 com.hk
 com.tw.prod.hosts.ooklaserver.net
+connect.facebook.net
 danbooru.donmai.us
 deepshark.net
 dlsite.com
@@ -36,6 +40,7 @@ google.com
 googleusercontent.com
 googlevideo.com
 gose.life
+gravatar.com
 hgamegallery.com
 hinet.net
 i.pximg.net
@@ -48,6 +53,7 @@ iwara.tv
 jcphi.com
 jnn-pa.googleapis.com
 konachan.com
+login.live.com
 morencius.com
 morphify.net
 mosevura.com
@@ -63,6 +69,7 @@ pinterest.com
 pixai.art
 pixibay.cc
 pixiv.net
+rule34video.com
 sankakucomplex.com
 securetoken.googleapis.com
 seednet-ty1.seed.net.tw.prod.hosts.ooklaserver.net
