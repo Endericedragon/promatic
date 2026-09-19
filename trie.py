@@ -2,7 +2,7 @@ import unittest
 from collections import deque
 from enum import Enum
 from pathlib import Path
-from typing import Deque, Dict, List
+from typing import Deque, Dict, List, Set, Tuple
 
 from log_utils import get_logger
 
@@ -97,28 +97,39 @@ class TrieNode:
 
 
 class DomainTrie:
-    def __init__(self):
+    def __init__(self, forced_trie: "DomainTrie | None" = None):
         self.root: TrieNode = TrieNode(NodeStatus.BRANCH)
+        self.forced_trie: "DomainTrie | None" = forced_trie
         self.is_dirty: bool = False
         self.path_whitelist = Path("whitelist.txt")
         self.path_greylist = Path("greylist.txt")
         self.path_blacklist = Path("blacklist.txt")
 
     def load_and_tag(self, rule_path: Path, ns: NodeStatus):
-        """加载规则文件，将域名标记为指定状态"""
+        """加载规则文件，将域名标记为指定状态。但是，如果域名在强制规则中，则不会被标记。"""
         if not rule_path.exists():
             rule_path.parent.mkdir(parents=True, exist_ok=True)
             rule_path.touch(exist_ok=True)
+            return self
         with open(rule_path, "r", encoding="utf-8") as f:
             while line := f.readline():
                 line = line.strip()
                 if not line:
+                    continue
+                if (
+                    self.forced_trie
+                    and self.forced_trie.search(line) != NodeStatus.BRANCH
+                ):
+                    self.is_dirty = True
                     continue
                 self.insert(line, ns)
         return self
 
     def insert(self, domain: str, status: NodeStatus):
         """倒序插入域名，例如 a.google.com -> 插入路径: com -> google -> a。"""
+
+        if self.forced_trie and self.forced_trie.search(domain) != NodeStatus.BRANCH:
+            return
 
         parts = reversed(domain.lower().split("."))  # 反转列表
         node = self.root
@@ -194,7 +205,7 @@ class ClassificationForest:
         self.path_blacklist = Path("blacklist.txt")
 
         self.forced_trie = DomainTrie()
-        self.detect_trie = DomainTrie()
+        self.detect_trie = DomainTrie(self.forced_trie)
         if load_rules:
             self.force_load_rules()
 
@@ -202,14 +213,52 @@ class ClassificationForest:
         self.forced_trie = self.forced_trie.load_and_tag(
             self.path_forced_proxy, NodeStatus.PROXY
         ).load_and_tag(self.path_forced_direct, NodeStatus.DIRECT)
+        self.purge_detected_trie()
         self.detect_trie = self.detect_trie.load_and_tag(
             self.path_whitelist, NodeStatus.DIRECT
         ).load_and_tag(self.path_blacklist, NodeStatus.PROXY)
 
+    def purge_detected_trie(self):
+        """清除探测树中和强制规则中相同的域名。
+        需要注意的是，只有节数>1的域名才有可能被清除，因此像.com这样的东西是不会被删除的。"""
+        if self.forced_trie is None:
+            return 0
+        n_deleted = 0
+        kept: Set[Tuple[str, NodeStatus]] = set()
+        path_domain: Deque[str] = deque()
+
+        def dfs(nn: TrieNode, path: Deque[str]):
+            nonlocal n_deleted
+            for txt, child in nn.children.items():
+                path.appendleft(txt)
+                # 1. 域名长度必须大于1
+                # 2. 域名必须在强制规则中
+                full_domain = ".".join(path)
+                if (
+                    len(path) > 1
+                    and self.forced_trie.search(full_domain) != NodeStatus.BRANCH
+                ):
+                    n_deleted += nn.count_direct + nn.count_proxy
+                    path.popleft()
+                    continue  # 子树就不用搜了
+                # 3. 域名不在强制规则中，且不是BRANCH节点，予以保留
+                if nn.status != NodeStatus.BRANCH:
+                    kept.add((full_domain, nn.status))
+                dfs(child, path)
+                path.popleft()
+
+        dfs(self.detect_trie.root, path_domain)
+
+        # 重建探测树
+        if n_deleted > 0:
+            self.detect_trie = DomainTrie(self.forced_trie)
+            for domain, status in kept:
+                self.detect_trie.insert(domain, status)
+            self.detect_trie.is_dirty = True
+        return n_deleted
+
     def insert(self, domain: str, status: NodeStatus):
         """探测到可直连/需代理的域名，且不在强制规则中时，加入探测树"""
-        if self.forced_trie.search(domain) != NodeStatus.BRANCH:
-            return
         return self.detect_trie.insert(domain, status)
 
     def search(self, domain: str) -> NodeStatus:

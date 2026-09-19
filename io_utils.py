@@ -14,7 +14,6 @@ from errors import (
     FakeDirectError,
     DirectHandshakeError,
     ProxyHandshakeError,
-    ProxyHandshakeError,
 )
 from log_utils import get_logger
 
