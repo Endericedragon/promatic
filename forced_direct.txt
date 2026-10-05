@@ -6,3 +6,6 @@ bilivideo.cn
 bilivideo.com
 deepseek.com
 hdslb.com
+rbtab.com
+hcaptcha.com
+mountaintoys.cn

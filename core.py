@@ -2,20 +2,16 @@ import asyncio as aio
 from urllib.parse import urlparse
 
 from consts import (
+    FOREST,
     MAX_DIRECT_TIMEOUT,
     MAX_PROXY_TIMEOUT,
-    FOREST,
     get_backend_port,
     get_port,
 )
-from trie import NodeStatus
-from io_utils import (
-    bidirectional_pipe,
-    read_headers,
-    safe_close,
-)
-from protos import HTTP_INSTANCE, HTTPS_INSTANCE, ProxyRequest
+from io_utils import bidirectional_pipe, read_headers, safe_close
 from log_utils import get_logger
+from protos import HttpProto, HttpsProto, ProxyRequest
+from trie import NodeStatus
 
 LOGGER = get_logger()
 
@@ -129,15 +125,19 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
         match method:
             case "CONNECT":
                 # HTTPS
-                host, port_str = path.split(":", 1)
-                port = int(port_str)
-                proxy_req = ProxyRequest(HTTPS_INSTANCE, host, header_bytes)
+                colon = path.find(":")
+                if colon == -1:
+                    host, port = path, None
+                else:
+                    host, port = path[:colon], int(path[colon + 1 :])
+                proxy_req = ProxyRequest(HttpsProto(port), host, header_bytes)
                 await handle_conn_unified(reader, writer, proxy_req)
             case _:
                 # HTTP请求，如GET、POST等
                 parsed = urlparse(path)
                 assert parsed.hostname is not None
-                proxy_req = ProxyRequest(HTTP_INSTANCE, parsed.hostname, header_bytes)
+                port = parsed.port
+                proxy_req = ProxyRequest(HttpProto(port), parsed.hostname, header_bytes)
                 await handle_conn_unified(reader, writer, proxy_req)
     except Exception as e:
         LOGGER.error(f"[ServerErr] {type(e).__name__}: {e}")

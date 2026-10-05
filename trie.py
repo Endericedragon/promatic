@@ -238,12 +238,12 @@ class ClassificationForest:
                     len(path) > 1
                     and self.forced_trie.search(full_domain) != NodeStatus.BRANCH
                 ):
-                    n_deleted += nn.count_direct + nn.count_proxy
+                    n_deleted += child.count_direct + child.count_proxy
                     path.popleft()
                     continue  # 子树就不用搜了
                 # 3. 域名不在强制规则中，且不是BRANCH节点，予以保留
-                if nn.status != NodeStatus.BRANCH:
-                    kept.add((full_domain, nn.status))
+                if child.status != NodeStatus.BRANCH:
+                    kept.add((full_domain, child.status))
                 dfs(child, path)
                 path.popleft()
 

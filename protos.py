@@ -14,6 +14,7 @@ class ProxyRequest:
     header_bytes: bytearray
 
 
+@dataclass(slots=True)
 class Proto(ABC):
     """策略基类，规定在隧道建立、和通信开始前的一系列动作。"""
 
@@ -40,8 +41,8 @@ class Proto(ABC):
 
 
 class HttpProto(Proto):
-    port = 80
-    log_symbol = "H"
+    def __init__(self, port: int | None) -> None:
+        super().__init__(port or 80, "H")
 
     @override
     async def setup_proxy_tunnel(
@@ -66,8 +67,8 @@ class HttpProto(Proto):
 
 
 class HttpsProto(Proto):
-    port = 443
-    log_symbol = "S"
+    def __init__(self, port: int | None) -> None:
+        super().__init__(port or 443, "S")
 
     @override
     async def setup_proxy_tunnel(
@@ -99,7 +100,3 @@ class HttpsProto(Proto):
         """HTTPS隧道建立，向客户端回复CONN_ESTABLISHED"""
         client_writer.write(CONN_ESTABLISHED.encode("latin1"))
         await client_writer.drain()
-
-
-HTTP_INSTANCE = HttpProto()
-HTTPS_INSTANCE = HttpsProto()
