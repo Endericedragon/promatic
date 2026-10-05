@@ -125,20 +125,20 @@ async def start_proxy_server(reader: aio.StreamReader, writer: aio.StreamWriter)
         match method:
             case "CONNECT":
                 # HTTPS
-                colon = path.find(":")
-                if colon == -1:
-                    host, port = path, None
-                else:
-                    host, port = path[:colon], int(path[colon + 1 :])
-                proxy_req = ProxyRequest(HttpsProto(port), host, header_bytes)
-                await handle_conn_unified(reader, writer, proxy_req)
+                parsed = urlparse("//{}".format(path))
+                assert parsed.hostname is not None
+                proxy_req = ProxyRequest(
+                    HttpsProto(parsed.port), parsed.hostname, header_bytes
+                )
+                # await handle_conn_unified(reader, writer, proxy_req)
             case _:
                 # HTTP请求，如GET、POST等
                 parsed = urlparse(path)
                 assert parsed.hostname is not None
-                port = parsed.port
-                proxy_req = ProxyRequest(HttpProto(port), parsed.hostname, header_bytes)
-                await handle_conn_unified(reader, writer, proxy_req)
+                proxy_req = ProxyRequest(
+                    HttpProto(parsed.port), parsed.hostname, header_bytes
+                )
+        await handle_conn_unified(reader, writer, proxy_req)
     except Exception as e:
         LOGGER.error(f"[ServerErr] {type(e).__name__}: {e}")
     finally:
